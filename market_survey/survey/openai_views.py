@@ -1,6 +1,9 @@
 import os
 import math
-import openai
+try:
+    import openai
+except ImportError:
+    openai = None
 from django.conf import settings
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -77,6 +80,9 @@ def call_openai_and_charge(user, messages, model="gpt-4o-mini", max_tokens=512, 
         total_tokens = 0
         credits_needed = 0
     else:
+        if openai is None:
+            raise RuntimeError("OpenAI SDK non installé")
+
         resp = openai.ChatCompletion.create(
             model=model,
             messages=messages,
