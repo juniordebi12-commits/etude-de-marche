@@ -1,0 +1,7 @@
+{% extends "survey/base.html" %}
+{% block content %}
+<div class="container mt-5 text-center">
+  <div class="alert alert-success">Vous êtes déconnecté·e.</div>
+  <a href="{% url 'login' %}" class="btn btn-primary">Se reconnecter</a>
+</div>
+{% endblock %}

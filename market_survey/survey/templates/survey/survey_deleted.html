@@ -1,0 +1,10 @@
+{% extends "survey/base.html" %}
+{% block content %}
+<div class="container mt-5 text-center">
+    <h2>Le questionnaire "{{ deleted_title }}" a bien été supprimé.</h2>
+    <div class="mt-4">
+        <a href="{% url 'survey_list' %}" class="btn btn-secondary me-2">Retour à la liste</a>
+        <a href="{% url 'survey_create' %}" class="btn btn-success">Créer un nouveau questionnaire</a>
+    </div>
+</div>
+{% endblock %}

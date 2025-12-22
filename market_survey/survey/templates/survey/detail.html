@@ -1,0 +1,94 @@
+{% extends "survey/base.html" %}
+{% block content %}
+
+<div class="container mt-5 mb-5 d-flex justify-content-center">
+    <div class="survey-detail-card p-5 shadow-lg rounded-4 w-100" style="max-width: 850px;">
+        <h2 class="fw-bold text-center adaptive-blue mb-3">{{ survey.title }}</h2>
+        <p class="card-text survey-description text-center mb-3">{{ survey.description }}</p>
+
+        <hr class="mb-4">
+
+        <h4 class="fw-semibold mb-3">Questions du questionnaire</h4>
+
+        <ul class="list-group list-group-flush rounded-4 overflow-hidden mb-5">
+            {% for question in questions %}
+                <li class="list-group-item py-3 px-4 question-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong class="text-primary">{{ forloop.counter }}.</strong>
+                            <span class="fw-semibold">{{ question.text }}</span>
+                            <div class="text-secondary small mt-1">
+                                <i class="bi bi-tag"></i> Type : {{ question.get_question_type_display }}
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            {% empty %}
+                <li class="list-group-item text-muted py-4 text-center">
+                    😕 Aucune question enregistrée pour ce questionnaire.
+                </li>
+            {% endfor %}
+        </ul>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <a href="{% url 'survey_list' %}" class="btn btn-outline-secondary btn-lg rounded-1">
+                ← Retour à la liste
+            </a>
+
+             <div class="d-flex gap-2">
+                <a href="{% url 'take_survey' survey.id %}" class="btn btn-primary">
+                     Commencer
+                </a>
+                <a href="{% url 'survey_edit' survey.id %}" class="btn btn-warning text-dark">
+                     Modifier
+                </a>
+                <a href="{% url 'survey_delete' survey.id %}" class="btn btn-danger">
+                     Supprimer
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .survey-detail-card {
+        background-color: var(--bs-body-bg);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        animation: fadeIn 0.6s ease-in-out forwards;
+    }
+
+    @keyframes fadeIn {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .question-item {
+        transition: background-color 0.25s ease, transform 0.2s ease;
+    }
+
+    .question-item:hover {
+        background-color: rgba(13, 202, 240, 0.05);
+        transform: translateX(4px);
+    }
+
+    .adaptive-blue {
+        color: #0dcaf0;
+    }
+
+    body.dark-mode .adaptive-blue {
+        color: #58d6ff;
+    }
+
+    body.dark-mode .survey-detail-card {
+        background-color: #1e1e1e;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+</style>
+
+{% endblock %}

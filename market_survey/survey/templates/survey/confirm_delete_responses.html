@@ -1,0 +1,79 @@
+{% extends "survey/base.html" %}
+{% block content %}
+
+<div class="container mt-5 mb-5 d-flex justify-content-center">
+    <div class="delete-card p-5 shadow-lg rounded-4 text-center">
+        <div class="delete-icon mb-3">
+            <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size: 3rem;"></i>
+        </div>
+
+        <h3 class="fw-bold mb-3 text-danger">Suppression définitive</h3>
+        <p class="text-secondary mb-4">
+            Vous êtes sur le point de supprimer <strong>toutes les réponses</strong> du questionnaire
+            <span class="text-primary fw-semibold">« {{ survey.title }} »</span>.<br>
+            ⚠️ Cette action est <strong>irréversible</strong>.
+        </p>
+
+        <form method="POST">
+            {% csrf_token %}
+            <div class="d-flex justify-content-center gap-3 mt-4">
+                <a href="{% url 'survey_summary' survey.id %}" class="btn btn-outline-secondary px-4 py-2 rounded-3">
+                    Annuler
+                </a>
+                <button type="submit" class="btn btn-danger px-4 py-2 rounded-3 fw-semibold btn-delete">
+                    🗑️ Supprimer toutes les réponses
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .delete-card {
+        background-color: var(--bs-body-bg);
+        max-width: 600px;
+        transition: all 0.3s ease;
+    }
+
+    /* Animation d'apparition */
+    .delete-card {
+        transform: translateY(20px);
+        opacity: 0;
+        animation: slideIn 0.5s ease-out forwards;
+    }
+
+    @keyframes slideIn {
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .btn-delete:hover {
+        background-color: #dc3545;
+        box-shadow: 0 0 12px rgba(220, 53, 69, 0.4);
+        transform: translateY(-2px);
+        transition: 0.2s ease;
+    }
+
+    body.dark-mode .delete-card {
+        background-color: #1e1e1e;
+    }
+
+    .delete-icon {
+        animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+            opacity: 0.9;
+        }
+        50% {
+            transform: scale(1.1);
+            opacity: 1;
+        }
+    }
+</style>
+
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "survey/base.html" %}
+{% block content %}
+
+<div class="container text-center mt-5 mb-5">
+    <div class="thankyou-card p-5 rounded-4 shadow-lg mx-auto" style="max-width: 600px;">
+        <div class="checkmark mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="#0dcaf0" class="bi bi-check-circle-fill animate-check" viewBox="0 0 16 16">
+                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM6.97 10.97a.75.75 0 0 0 1.08 0l3.992-3.992a.75.75 0 1 0-1.06-1.06L7.5 9.439 5.03 6.97a.75.75 0 0 0-1.08 1.04l3.02 2.96z"/>
+            </svg>
+        </div>
+
+        <h2 class="fw-bold adaptive-blue mb-3">Merci pour votre participation 🎉</h2>
+        <p class="text-secondary-emphasis mb-4 fs-5">Vos réponses ont été enregistrées avec succès.  
+        Nous apprécions votre contribution à cette étude.</p>
+
+        <div class="d-flex justify-content-center gap-3 mt-4">
+            <a href="{% url 'take_survey' survey.id %}" class="btn btn-outline-info btn-lg">
+                🔁 Continuer l'enquête
+            </a>
+            <a href="{% url 'survey_list' %}" class="btn btn-success btn-lg">
+                ✅ Terminer
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .thankyou-card {
+        background-color: var(--bs-body-bg);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background-color 0.3s ease, transform 0.3s ease;
+    }
+
+    .thankyou-card:hover {
+        transform: translateY(-4px);
+    }
+
+    .adaptive-blue {
+        color: #0dcaf0;
+    }
+
+    body.dark-mode .adaptive-blue {
+        color: #58d6ff;
+    }
+
+    body.dark-mode .thankyou-card {
+        background-color: #1e1e1e;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .checkmark {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .animate-check {
+        animation: pop 0.6s ease-out;
+    }
+
+    @keyframes pop {
+        0% { transform: scale(0); opacity: 0; }
+        70% { transform: scale(1.2); opacity: 1; }
+        100% { transform: scale(1); }
+    }
+
+    .btn-outline-info {
+        border-radius: 10px;
+        border: 2px solid #0dcaf0;
+        color: #0dcaf0;
+        transition: all 0.3s ease;
+    }
+
+    .btn-outline-info:hover {
+        background-color: #0dcaf0;
+        color: white;
+    }
+
+    .btn-success {
+        border-radius: 10px;
+        font-weight: 600;
+    }
+</style>
+
+{% endblock %}

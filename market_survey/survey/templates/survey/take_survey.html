@@ -1,0 +1,128 @@
+{% extends "survey/base.html" %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="survey-card p-4 rounded-4 shadow-lg">
+        <h2 class="fw-bold mb-2 adaptive-blue text-center">{{ survey.title }}</h2>
+        <p class="text-secondary-emphasis text-center mb-4">{{ survey.description }}</p>
+
+        {% if error %}
+            <div class="alert alert-danger text-center fw-semibold">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" class="survey-form">
+            {% csrf_token %}
+
+            {% for question in questions %}
+                <div class="question-box mb-4 p-3 rounded-3">
+                    <label class="form-label fw-semibold d-block mb-2">
+                        {{ forloop.counter }}. {{ question.text }}
+                    </label>
+
+                    {% if question.question_type == "text" %}
+                        <textarea name="question_{{ question.id }}" class="form-control shadow-sm" rows="3"
+                                  placeholder="Votre réponse..."></textarea>
+
+                    {% elif question.question_type == "number" %}
+                        <input type="number" name="question_{{ question.id }}" class="form-control shadow-sm"
+                               placeholder="Entrez un nombre">
+
+                    {% elif question.question_type == "single" %}
+                        {% for choice in question.choices.all %}
+                            <div class="form-check mb-1">
+                                <input class="form-check-input" type="radio"
+                                       name="question_{{ question.id }}"
+                                       value="{{ choice.id }}"
+                                       id="choice_{{ choice.id }}">
+                                <label class="form-check-label" for="choice_{{ choice.id }}">
+                                    {{ choice.text }}
+                                </label>
+                            </div>
+                        {% endfor %}
+
+                    {% elif question.question_type == "multiple" %}
+                        {% for choice in question.choices.all %}
+                            <div class="form-check mb-1">
+                                <input class="form-check-input" type="checkbox"
+                                       name="question_{{ question.id }}"
+                                       value="{{ choice.id }}"
+                                       id="choice_{{ choice.id }}">
+                                <label class="form-check-label" for="choice_{{ choice.id }}">
+                                    {{ choice.text }}
+                                </label>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <div class="mb-4">
+                <label class="fw-semibold mb-2">👤 Nom de l'enquêteur</label>
+                <input type="text" name="interviewer_name" class="form-control shadow-sm"
+                       required placeholder="Entrez votre nom complet">
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'survey_detail' survey.id %}" class="btn btn-outline-secondary btn-lg">
+                    ← Retour
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg fw-semibold">
+                   Envoyer les réponses
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    /* Carte principale */
+    .survey-card {
+        background-color: var(--bs-body-bg);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* Zone de question */
+    .question-box {
+        background-color: rgba(0, 0, 0, 0.03);
+        transition: background-color 0.3s ease;
+    }
+
+    /* Mode sombre : contraste accru */
+    body.dark-mode .survey-card {
+        background-color: #1e1e1e;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    body.dark-mode .question-box {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Texte et accent */
+    .adaptive-blue {
+        color: #0dcaf0;
+    }
+
+    body.dark-mode .adaptive-blue {
+        color: #58d6ff;
+    }
+
+    .form-control, .form-check-input {
+        border-radius: 10px;
+        transition: all 0.2s ease;
+    }
+
+    .form-control:focus, .form-check-input:focus {
+        box-shadow: 0 0 0 0.2rem rgba(13, 202, 240, 0.25);
+    }
+
+    .btn-primary {
+        background-color: #0dcaf0;
+        border: none;
+        transition: background-color 0.3s ease;
+    }
+
+    .btn-primary:hover {
+        background-color: #0bbbdc;
+    }
+</style>
+{% endblock %}

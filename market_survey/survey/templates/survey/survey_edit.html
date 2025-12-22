@@ -1,0 +1,354 @@
+{% extends "survey/base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold adaptive-title"> Modifier le questionnaire</h2>
+        <p class="text-secondary small mb-3">Ajustez le titre, la description ou réorganisez les questions.</p>
+        <h5 class="fw-bold adaptive-blue">{{ survey.title }}</h5>
+    </div>
+
+    <div id="undo-container" class="alert alert-warning d-none text-center rounded-pill shadow-sm py-2" role="alert">
+        Une question a été supprimée.
+        <button id="undo-btn" class="btn btn-sm btn-outline-dark ms-2">↩️ Annuler</button>
+    </div>
+
+    <form method="POST" id="surveyEditForm" class="bg-body-tertiary rounded-4 shadow-lg p-4">
+        {% csrf_token %}
+
+        <div class="mb-4">
+            <label for="title" class="form-label">Titre du questionnaire</label>
+            <input type="text" class="form-control form-control-lg" id="title" name="title"
+                   value="{{ survey.title }}" required>
+        </div>
+
+        <div class="mb-4">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="3"
+                      placeholder="Décrivez brièvement le but de cette étude...">{{ survey.description }}</textarea>
+        </div>
+
+        <hr class="border-secondary">
+
+        <h4 class="text-info mt-4 mb-3"> Questions existantes</h4>
+        <div id="questions-container">
+            {% for q in survey.questions.all %}
+                <div class="question-item mb-3 rounded-4 p-3 shadow-sm bg-body-tertiary border border-secondary-subtle"
+                     data-id="{{ q.id }}" draggable="true">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="question-label fw-semibold">{{ forloop.counter }}. {{ q.text }}</label>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-question">🗑️</button>
+                    </div>
+
+                    <input type="text" name="question_text_existing_{{ q.id }}"
+                           class="form-control mb-2" value="{{ q.text }}" required>
+
+                    <label class="form-label small text-secondary">Type de réponse</label>
+                    <select name="question_type_existing_{{ q.id }}"
+                            class="form-select question_type mb-2">
+                        <option value="text" {% if q.question_type == "text" %}selected{% endif %}>Texte libre</option>
+                        <option value="single" {% if q.question_type == "single" %}selected{% endif %}>Choix unique</option>
+                        <option value="multiple" {% if q.question_type == "multiple" %}selected{% endif %}>Choix multiple</option>
+                        <option value="number" {% if q.question_type == "number" %}selected{% endif %}>Réponse numérique</option>
+                    </select>
+
+                    {% if q.question_type == 'single' or q.question_type == 'multiple' %}
+                        <div class="choices_container mt-2" style="display:block;">
+                    {% else %}
+                        <div class="choices_container mt-2" style="display:none;">
+                    {% endif %}
+                        <label class="form-label small text-secondary">Options</label>
+                        <div class="choices_input mb-2">
+                            {% for choice in q.choices.all %}
+                                <input type="text" name="choices_existing_{{ q.id }}[]"
+                                       class="form-control mb-1" value="{{ choice.text }}">
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary add_choice_existing">Ajouter une option</button>
+                    </div>
+                </div>
+            {% empty %}
+                <p class="text-secondary">Aucune question existante. Ajoutez-en une nouvelle ci-dessous 👇</p>
+            {% endfor %}
+        </div>
+
+        <hr class="border-secondary">
+
+        <h4 class="text-info mt-4 mb-3">Ajouter de nouvelles questions</h4>
+        <div id="new-questions"></div>
+        <button type="button" id="add_question" class="btn btn-outline-info mt-3">Nouvelle question</button>
+
+        <hr class="border-secondary mt-4">
+
+        <div class="d-flex justify-content-between align-items-center mt-4">
+            <a href="{% url 'survey_detail' survey.id %}" class="btn btn-outline-secondary">← Retour</a>
+            <button type="submit" class="btn btn-success" id="save-btn">Enregistrer</button>
+        </div>
+    </form>
+</div>
+
+<style>
+/* Make question card visible both in light and dark modes.
+   Inputs are given subtle borders so they never "blend" into background. */
+
+.question-item {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    background-color: rgba(255,255,255,0.03); /* subtle in light and dark */
+}
+.question-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+/* Inputs: transparent feel but visible border to avoid blending */
+.question-item .form-control {
+    background: transparent;
+    color: inherit;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: .5rem;
+    box-shadow: none;
+    padding: .5rem .75rem;
+}
+.question-item .form-control:focus {
+    outline: none;
+    box-shadow: 0 0 0 0.15rem rgba(13,110,253,0.12);
+    border-color: rgba(13,110,253,0.6);
+}
+
+/* In dark mode increase border contrast and placeholder color */
+body.dark-mode .question-item .form-control {
+    border: 1px solid rgba(255,255,255,0.06);
+}
+body.dark-mode .question-item .form-control::placeholder {
+    color: #bdbdbd;
+}
+
+/* choices input spacing */
+.choices_input .form-control {
+    margin-bottom: .5rem;
+}
+
+/* Buttons small rounded */
+.remove-question { border-radius: 999px; }
+.add_choice_existing, .add_choice_new { border-radius: 999px; }
+
+/* Ensure selects also visible */
+.question-item .form-select {
+    background: transparent;
+    color: inherit;
+    border: 1px solid rgba(0,0,0,0.08);
+}
+body.dark-mode .question-item .form-select {
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Undo alert visibility */
+#undo-container.show { display:block !important; }
+
+/* Make sure overall container adapts */
+.bg-body-tertiary {
+    background-color: rgba(0,0,0,0.02) !important;
+}
+body.dark-mode .bg-body-tertiary {
+    background-color: rgba(255,255,255,0.02) !important;
+}
+</style>
+
+<script>
+(function () {
+    const newContainer = document.getElementById('new-questions');
+    const addBtn = document.getElementById('add_question');
+    const undoContainer = document.getElementById('undo-container');
+    const undoBtn = document.getElementById('undo-btn');
+    const existingContainer = document.getElementById('questions-container');
+
+    let lastDeletedQuestion = null;
+    let undoTimeout = null;
+    let draggedItem = null;
+
+    // renumber + update names for new choices
+    function renumberQuestions() {
+        const all = [...document.querySelectorAll('.question-item')];
+        all.forEach((el, idx) => {
+            el.dataset.index = idx;
+            // update label if present (for new items)
+            const title = el.querySelector('.question-label');
+            if (title) {
+                // if existing question (has data-id), show original id/title; otherwise show index
+                if (!el.dataset.id) title.innerText = `Question ${idx + 1}`;
+            }
+            // Update name attributes for new choices inputs (new_questions)
+            const newChoices = el.querySelectorAll('input[name^="new_choices_"]');
+            if (newChoices.length) {
+                newChoices.forEach((inp) => {
+                    // pick last numeric part from current dataset index
+                    inp.name = `new_choices_${idx}[]`;
+                });
+            }
+            // update name attributes for new question text fields
+            const newText = el.querySelector('input[name="question_text[]"], input[name="new_question_text[]"]');
+            if (newText && el.dataset.index !== undefined && newText.name !== null) {
+                // keep name "new_question_text[]" — no change needed
+            }
+        });
+    }
+
+    // Create HTML for a new question (names use placeholder index and will be fixed by renumberQuestions)
+    function createQuestionHTML(index) {
+        return `
+        <div class="question-item mb-3 rounded-4 p-3 shadow-sm bg-body-tertiary border border-secondary-subtle"
+             draggable="true" data-index="${index}">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="question-label fw-semibold">Nouvelle question ${index + 1}</label>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-question">🗑️</button>
+            </div>
+
+            <input type="text" name="new_question_text[]" class="form-control mb-2" placeholder="Texte de la question" required>
+
+            <label class="form-label small text-secondary">Type de réponse</label>
+            <select name="new_question_type[]" class="form-select question_type mb-2">
+                <option value="text">Texte libre</option>
+                <option value="single">Choix unique</option>
+                <option value="multiple">Choix multiple</option>
+                <option value="number">Réponse numérique</option>
+            </select>
+
+            <div class="choices_container mt-2" style="display:none;">
+                <label class="form-label small text-secondary">Options</label>
+                <div class="choices_input mb-2">
+                    <input type="text" name="new_choices_${index}[]" class="form-control mb-1" placeholder="Option 1">
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary add_choice_new">➕ Ajouter une option</button>
+            </div>
+        </div>`;
+    }
+
+    addBtn.addEventListener('click', () => {
+        const index = document.querySelectorAll('.question-item').length;
+        newContainer.insertAdjacentHTML('beforeend', createQuestionHTML(index));
+        renumberQuestions();
+    });
+
+    // click handlers (delegation)
+    document.addEventListener('click', (e) => {
+        // add option for existing question
+        if (e.target.closest && e.target.closest('.add_choice_existing')) {
+            const btn = e.target.closest('.add_choice_existing');
+            const qItem = btn.closest('.question-item');
+            const qId = qItem.dataset.id;
+            const container = qItem.querySelector('.choices_input');
+            const count = container.querySelectorAll('input').length + 1;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = `choices_existing_${qId}[]`;
+            input.className = 'form-control mb-1';
+            input.placeholder = `Option ${count}`;
+            container.appendChild(input);
+            return;
+        }
+
+        // add option for new question
+        if (e.target.closest && e.target.closest('.add_choice_new')) {
+            const btn = e.target.closest('.add_choice_new');
+            const qItem = btn.closest('.question-item');
+            const idx = qItem.dataset.index !== undefined ? qItem.dataset.index : Array.from(qItem.parentNode.children).indexOf(qItem);
+            const container = qItem.querySelector('.choices_input');
+            const count = container.querySelectorAll('input').length + 1;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = `new_choices_${idx}[]`;
+            input.className = 'form-control mb-1';
+            input.placeholder = `Option ${count}`;
+            container.appendChild(input);
+            return;
+        }
+
+        // remove question
+        if (e.target.closest && e.target.closest('.remove-question')) {
+            const btn = e.target.closest('.remove-question');
+            const question = btn.closest('.question-item');
+            if (!confirm("Voulez-vous vraiment supprimer cette question ?")) return;
+
+            lastDeletedQuestion = question.cloneNode(true);
+            question.remove();
+            renumberQuestions();
+
+            undoContainer.classList.remove('d-none');
+            clearTimeout(undoTimeout);
+            undoTimeout = setTimeout(() => {
+                undoContainer.classList.add('d-none');
+                lastDeletedQuestion = null;
+            }, 10000);
+            return;
+        }
+    });
+
+    // undo
+    undoBtn.addEventListener('click', () => {
+        if (!lastDeletedQuestion) return;
+        const targetContainer = lastDeletedQuestion.dataset.id ? existingContainer : newContainer;
+        targetContainer.appendChild(lastDeletedQuestion);
+        lastDeletedQuestion = null;
+        undoContainer.classList.add('d-none');
+        clearTimeout(undoTimeout);
+        renumberQuestions();
+    });
+
+    // show/hide choices based on type
+    document.addEventListener('change', (e) => {
+        if (!e.target.classList) return;
+        if (e.target.classList.contains('question_type')) {
+            const qItem = e.target.closest('.question-item');
+            const choicesDiv = qItem.querySelector('.choices_container');
+            if (!choicesDiv) return;
+            if (e.target.value === 'single' || e.target.value === 'multiple') {
+                choicesDiv.style.display = 'block';
+            } else {
+                choicesDiv.style.display = 'none';
+            }
+        }
+    });
+
+    // drag & drop handlers
+    document.addEventListener('dragstart', (e) => {
+        if (e.target.classList && e.target.classList.contains('question-item')) {
+            draggedItem = e.target;
+            e.target.classList.add('dragging');
+        }
+    });
+    document.addEventListener('dragend', (e) => {
+        if (e.target.classList) e.target.classList.remove('dragging');
+        draggedItem = null;
+        renumberQuestions();
+    });
+    document.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const container = e.target.closest('#new-questions, #questions-container');
+        if (!container) return;
+        const afterElement = getDragAfterElement(container, e.clientY);
+        if (afterElement == null) container.appendChild(draggedItem);
+        else container.insertBefore(draggedItem, afterElement);
+    });
+    function getDragAfterElement(container, y) {
+        const elements = [...container.querySelectorAll('.question-item:not(.dragging)')];
+        return elements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) return { offset, element: child };
+            return closest;
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // Save confirmation
+    const saveBtn = document.getElementById("save-btn");
+    if (saveBtn) {
+        saveBtn.addEventListener("click", function (e) {
+            const confirmation = confirm("Voulez-vous vraiment enregistrer les modifications ?");
+            if (!confirmation) e.preventDefault();
+        });
+    }
+
+    // initial renumber
+    renumberQuestions();
+})();
+</script>
+{% endblock %}

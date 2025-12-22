@@ -1,0 +1,215 @@
+{% extends "survey/base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">📝 Créer un nouveau questionnaire</h2>
+
+    <form method="POST" id="surveyForm">
+        {% csrf_token %}
+
+        <!-- Titre et description -->
+        <div class="mb-3">
+            <label for="title" class="form-label">Titre du questionnaire</label>
+            <input type="text" class="form-control" id="title" name="title" placeholder="Ex : Étude de satisfaction clients" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="3" placeholder="Décrivez brièvement le but de cette étude..."></textarea>
+        </div>
+
+        <hr>
+        <h4>Questions</h4>
+
+        <div id="questions-container">
+            <!-- Question initiale -->
+            <div class="question-item mb-3 border rounded p-3 bg-light" data-index="0" draggable="true">
+                <div class="d-flex justify-content-between align-items-center">
+                    <label class="question-label"><strong>Question 1</strong></label>
+                    <button type="button" class="btn btn-danger btn-delete remove-question" style="display:none;">🗑️</button>
+                </div>
+
+                <input type="text" name="question_text[]" class="form-control mb-2" placeholder="Texte de la question" required>
+
+                <label>Type de réponse</label>
+                <select name="question_types[]" class="form-select question_type mb-2">
+                    <option value="text">Texte libre</option>
+                    <option value="single">Choix unique</option>
+                    <option value="multiple">Choix multiple</option>
+                    <option value="number">Réponse numérique</option>
+                </select>
+
+                <div class="choices_container mt-2" style="display:none;">
+                    <label>Options</label>
+                    <div class="choices_input mb-1">
+                        <input type="text" name="choices_0[]" class="form-control mb-1" placeholder="Option 1">
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary add_choice">➕ Ajouter une option</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+            <button type="button" id="add_question" class="btn btn-info">➕ Ajouter une question</button>
+        </div>
+
+        <hr>
+
+        <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'survey_list' %}" class="btn btn-secondary">← Retour à la liste</a>
+            <div>
+                <button type="reset" class="btn btn-warning btn-edit">🗑️ Réinitialiser tout</button>
+                <button type="submit" class="btn btn-success">✅ Créer le questionnaire</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+.question-item {
+    border-radius: 1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    background: #fdfdfd;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    cursor: grab;
+}
+.question-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+.remove-question {
+    transition: transform 0.2s;
+}
+.remove-question:hover {
+    transform: scale(1.2);
+}
+</style>
+
+<script>
+(function () {
+    const container = document.getElementById('questions-container');
+    const addQuestionBtn = document.getElementById('add_question');
+    let draggedItem = null;
+
+    window.renumberQuestions = function renumberQuestions() {
+        const items = container.querySelectorAll('.question-item');
+        items.forEach((item, idx) => {
+            item.dataset.index = idx;
+            const label = item.querySelector('.question-label');
+            if (label) label.innerHTML = `<strong>Question ${idx + 1}</strong>`;
+            const choicesInputs = item.querySelectorAll('.choices_input input');
+            choicesInputs.forEach(inp => inp.name = `choices_${idx}[]`);
+            const removeBtn = item.querySelector('.remove-question');
+            if (removeBtn) removeBtn.style.display = idx === 0 ? 'none' : 'inline-block';
+        });
+    }
+
+    function createQuestionHTML() {
+        return `
+        <div class="question-item mb-3 border rounded p-3 bg-light" data-index="" draggable="true">
+            <div class="d-flex justify-content-between align-items-center">
+                <label class="question-label"><strong>Question</strong></label>
+                <button type="button" class="btn btn-danger btn-delete remove-question">🗑️</button>
+            </div>
+
+            <input type="text" name="question_text[]" class="form-control mb-2" placeholder="Texte de la question" required>
+
+            <label>Type de réponse</label>
+            <select name="question_types[]" class="form-select question_type mb-2">
+                <option value="text">Texte libre</option>
+                <option value="single">Choix unique</option>
+                <option value="multiple">Choix multiple</option>
+                <option value="number">Réponse numérique</option>
+            </select>
+
+            <div class="choices_container mt-2" style="display:none;">
+                <label>Options</label>
+                <div class="choices_input mb-1">
+                    <input type="text" name="choices_[]" class="form-control mb-1" placeholder="Option 1">
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary add_choice">➕ Ajouter une option</button>
+            </div>
+        </div>
+        `;
+    }
+
+    addQuestionBtn.addEventListener('click', function () {
+        container.insertAdjacentHTML('beforeend', createQuestionHTML());
+        renumberQuestions();
+    });
+
+    document.addEventListener('change', function (e) {
+        if (e.target && e.target.classList.contains('question_type')) {
+            const qItem = e.target.closest('.question-item');
+            const choicesDiv = qItem.querySelector('.choices_container');
+            if (e.target.value === 'single' || e.target.value === 'multiple') {
+                choicesDiv.style.display = 'block';
+            } else {
+                choicesDiv.style.display = 'none';
+            }
+        }
+    });
+
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.classList.contains('add_choice')) {
+            e.preventDefault();
+            const choicesInputDiv = e.target.closest('.choices_container').querySelector('.choices_input');
+            const qItem = e.target.closest('.question-item');
+            const idx = qItem.dataset.index ? qItem.dataset.index : Array.from(container.children).indexOf(qItem);
+            const count = choicesInputDiv.querySelectorAll('input').length + 1;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = `choices_${idx}[]`;
+            input.classList.add('form-control', 'mb-1');
+            input.placeholder = `Option ${count}`;
+            choicesInputDiv.appendChild(input);
+        }
+
+        if (e.target && e.target.classList.contains('remove-question')) {
+            e.preventDefault();
+            const qItem = e.target.closest('.question-item');
+            qItem.remove();
+            renumberQuestions();
+        }
+    });
+
+    // Drag & drop
+    document.addEventListener('dragstart', (e) => {
+        if (e.target.classList.contains('question-item')) {
+            draggedItem = e.target;
+            e.target.classList.add('dragging');
+        }
+    });
+    document.addEventListener('dragend', (e) => {
+        e.target.classList.remove('dragging');
+        draggedItem = null;
+        renumberQuestions();
+    });
+    document.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const container = e.target.closest('#questions-container');
+        if (!container) return;
+        const afterElement = getDragAfterElement(container, e.clientY);
+        if (!afterElement) {
+            container.appendChild(draggedItem);
+        } else {
+            container.insertBefore(draggedItem, afterElement);
+        }
+    });
+    function getDragAfterElement(container, y) {
+        const elements = [...container.querySelectorAll('.question-item:not(.dragging)')];
+        return elements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    renumberQuestions();
+})();
+</script>
+{% endblock %}

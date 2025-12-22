@@ -1,0 +1,18 @@
+{% extends "survey/base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h3 class="text-center text-danger">⚠️ Confirmation de suppression</h3>
+
+    <div class="alert alert-warning mt-4 text-center">
+        <p>Êtes-vous sûr de vouloir supprimer l’enquêteur 
+           <strong>{{ respondent.interviewer_name }}</strong> 
+           et toutes ses réponses associées ?</p>
+    </div>
+
+    <form method="post" class="text-center mt-4">
+        {% csrf_token %}
+        <a href="{% url 'survey_summary' respondent.survey.id %}" class="btn btn-secondary">❌ Annuler</a>
+        <button type="submit" class="btn btn-danger">🗑️ Supprimer définitivement</button>
+    </form>
+</div>
+{% endblock %}

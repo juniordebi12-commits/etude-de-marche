@@ -1,0 +1,237 @@
+{% extends "survey/base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4 text-center">📊 Résumé de l’enquête : {{ survey.title }}</h2>
+
+    {% if messages %}
+        <div class="mt-3">
+            {% for message in messages %}
+                <div class="alert alert-success text-center">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <h4 class="mt-4">👥 Liste des enquêteurs</h4>
+
+    <table id="respondents-table" class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if respondents %}
+                {% for respondent in respondents %}
+                <tr>
+                    <td>{{ respondent.interviewer_name }}</td>
+                    <td>{{ respondent.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <a href="{% url 'delete_respondent' respondent.id %}" class="btn btn-danger btn-delete">
+                            Supprimer
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="3" class="text-center text-muted">
+                        Aucune enquête pour le moment.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h5>🗂️ Total d'enquête : {{ respondents|length }}</h5>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'export_survey_excel' survey.id %}" class="btn btn-outline-success mt-2">
+                ⬇️(.xlsx)
+            </a>
+            <a href="{% url 'export_survey_pdf' survey.id %}" class="btn btn-outline-primary btn-sm mt-2">
+                ⬇️(.pdf)
+            </a>
+            <a href="{% url 'delete_all_responses' survey.id %}" 
+               class="btn btn-danger btn-delete mt-2"
+               onclick="return confirm('⚠️ Cela supprimera TOUS les enquêteurs et leurs réponses. Continuer ?');">
+               Rénitialiser
+            </a>
+        </div>
+    </div>
+
+    <hr>
+    <div class="text-center my-4">
+        <h5>🔗 Partager cette enquête</h5>
+        <img src="{{ qr_code }}" class="border p-2 rounded shadow-sm">
+        <p class="mt-2 text-muted"><small>Scannez pour participer</small></p>
+        <p class="text-primary text-break">
+            🔗 {{ request.scheme }}://{{ request.get_host }}/survey/{{ survey.id }}/take
+        </p>
+    </div>
+
+    {% if wordcloud_img %}
+        <hr>
+        <h4 class="mt-4">💬 Analyse des réponses textuelles</h4>
+        <div class="row">
+            <div class="col-md-6 text-center">
+                <img src="{{ wordcloud_img }}" alt="Nuage de mots" class="img-fluid border rounded shadow-sm">
+            </div>
+            <div class="col-md-6">
+                <h6>Mots les plus fréquents :</h6>
+                <ul>
+                    {% for word, freq in top_words %}
+                        <li><strong>{{ word }}</strong> — {{ freq }} occurrence{{ freq|pluralize }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Option pour pourcentages -->
+    <div class="form-check form-switch mb-4 text-end">
+        <input class="form-check-input" type="checkbox" id="togglePercentages">
+        <label class="form-check-label" for="togglePercentages">Afficher les pourcentages</label>
+    </div>
+
+    <div class="mt-4">
+        <h4>📈 Résultats des questions</h4>
+        <div id="chart-container" class="d-flex flex-column gap-4"></div>
+    </div>
+
+    <div class="text-center mt-5">
+        <a href="{% url 'survey_list' %}" class="btn btn-secondary">← Retour</a>
+    </div>
+</div>
+
+<!-- Chart.js + datalabels -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
+<!-- DataTables pour filtrage & pagination -->
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<script>
+$(document).ready(function () {
+    $.fn.dataTable.ext.errMode = 'none';
+    $('#respondents-table').DataTable({
+        pageLength: 10,
+        lengthMenu: [5, 10, 20, 50],
+        language: {
+            search: "🔍 Rechercher:",
+            lengthMenu: "Afficher _MENU_ enquêteurs",
+            info: "Affichage _START_ à _END_ sur _TOTAL_",
+            paginate: {
+                previous: "←",
+                next: "→"
+            }
+        }
+    });
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+    const rawData = JSON.parse(`{{ chart_data|escapejs }}`);
+    const container = document.getElementById("chart-container");
+    const showPercentagesCheckbox = document.getElementById("togglePercentages");
+    const chartInstances = [];
+
+    function createChartCard(q, index, showPercentages) {
+        const card = document.createElement("div");
+        card.className = "card p-3 shadow-sm";
+
+        const title = document.createElement("h5");
+        title.textContent = `Q${index + 1}. ${q.text}`;
+        card.appendChild(title);
+
+        if (q.type === "text" || q.type === "number") {
+            const list = document.createElement("ul");
+            (q.answers || []).forEach(a => {
+                const li = document.createElement("li");
+                li.textContent = a || "(aucune réponse)";
+                list.appendChild(li);
+            });
+            card.appendChild(list);
+            return card;
+        }
+
+        const canvasWrapper = document.createElement("div");
+        canvasWrapper.style.width = "380px";
+        canvasWrapper.style.height = "380px";
+        canvasWrapper.style.margin = "auto";
+
+        const canvas = document.createElement("canvas");
+        canvas.id = `chart-${index}`;
+        canvasWrapper.appendChild(canvas);
+        card.appendChild(canvasWrapper);
+
+        const downloadBtn = document.createElement("button");
+        downloadBtn.className = "btn btn-outline-primary btn-sm mt-2 d-block mx-auto";
+        downloadBtn.textContent = "Télécharger le graphique";
+        downloadBtn.addEventListener("click", () => {
+            const a = document.createElement("a");
+            a.href = canvas.toDataURL("image/png");
+            const safeTitle = q.text.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40);
+            a.download = `Q${index + 1}_${safeTitle}.png`;
+            a.click();
+        });
+        card.appendChild(downloadBtn);
+
+        const total = (q.data || []).reduce((acc, v) => acc + (Number(v) || 0), 0);
+        const datalabelsOptions = showPercentages ? {
+            color: '#fff',
+            font: { weight: 'bold', size: 12 },
+            formatter: (value) => {
+                if (!total) return '';
+                const percentage = (Number(value) / total * 100);
+                return percentage < 1 ? '' : percentage.toFixed(1) + "%";
+            }
+        } : false;
+
+        const config = {
+            type: 'pie',
+            data: {
+                labels: q.labels || [],
+                datasets: [{ data: q.data || [] }]
+            },
+            options: { responsive: false, plugins: { legend: { position: 'bottom' } } },
+            plugins: []
+        };
+
+        if (showPercentages) {
+            config.options.plugins.datalabels = datalabelsOptions;
+            config.plugins = [ChartDataLabels];
+        }
+
+        const ctx = canvas.getContext("2d");
+        const chart = new Chart(ctx, config);
+        chartInstances.push(chart);
+
+        return card;
+    }
+
+    function renderCharts(show) {
+        chartInstances.forEach(c => { try { c.destroy(); } catch(e) {} });
+        chartInstances.length = 0;
+        container.innerHTML = "";
+        rawData.forEach((q, idx) => {
+            const card = createChartCard(q, idx, show);
+            container.appendChild(card);
+        });
+    }
+
+    renderCharts(false);
+
+    showPercentagesCheckbox.addEventListener("change", (e) => {
+        renderCharts(e.target.checked);
+    });
+});
+</script>
+
+{% endblock %}
