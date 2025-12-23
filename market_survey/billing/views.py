@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
 from django.shortcuts import get_object_or_404
+from .serializers import RegisterSerializer
+
 
 from .models import BillingAccount
 from .serializers import BillingAccountSerializer
@@ -137,3 +139,12 @@ def webhook_view(request):
     else:
         pr.mark_failed(reason=payload.get("reason", "provider_failed"))
         return Response({"ok": True, "status": pr.status})
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def register(request):
+    serializer = RegisterSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({"message": "Compte créé avec succès"}, status=201)
+    return Response(serializer.errors, status=400)
