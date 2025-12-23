@@ -5,9 +5,9 @@ import { useAuth } from "../api/useAuth";
 import { Link } from "react-router-dom";
 
 const CREDIT_PACKS = [
-  { id: "c1", name: "Pack Découverte", credits: 5000, price: "4 900 FCFA" },
-  { id: "c2", name: "Pack Pro", credits: 25000, price: "19 900 FCFA" },
-  { id: "c3", name: "Pack Volume", credits: 120000, price: "79 900 FCFA" },
+  { id: "c1", name: "Pack Découverte", credits: 5000, price: "Coming soon" },
+  { id: "c2", name: "Pack Pro", credits: 25000, price: "Coming soon" },
+  { id: "c3", name: "Pack Volume", credits: 120000, price: "Coming soon" },
 ];
 
 export default function Billing() {

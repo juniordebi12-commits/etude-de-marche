@@ -22,7 +22,7 @@ const TIERS = [
   {
     id: "pro",
     name: "Pro",
-    price: "9 900 FCFA",
+    price: "Coming soon",
     suffix: "/mois",
     subtitle: "Pour professionnels & petites équipes",
     bullets: [
@@ -52,9 +52,9 @@ const TIERS = [
 ];
 
 const CREDIT_PACKS = [
-  { id: "c1", title: "Découverte", credits: 5000, price: "4 900 FCFA" },
-  { id: "c2", title: "Pro", credits: 25000, price: "19 900 FCFA" },
-  { id: "c3", title: "Volume", credits: 120000, price: "79 900 FCFA" },
+  { id: "c1", title: "Découverte", credits: 5000, price: "Coming soon" },
+  { id: "c2", title: "Pro", credits: 25000, price: "Coming soon" },
+  { id: "c3", title: "Volume", credits: 120000, price: "Coming soon" },
 ];
 
 export default function Pricing() {
