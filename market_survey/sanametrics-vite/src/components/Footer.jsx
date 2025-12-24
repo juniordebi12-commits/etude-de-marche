@@ -61,12 +61,6 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="border-t mt-10 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400">
           <div>© 2025 SanaMetrics — Tous droits réservés.</div>
-
-          <div className="mt-3 md:mt-0 flex items-center gap-2">
-            <span>Fait avec ❤️</span>
-            <span className="opacity-50">•</span>
-            <span>Design minimal & moderne</span>
-          </div>
         </div>
       </div>
     </footer>
