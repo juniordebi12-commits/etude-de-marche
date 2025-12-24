@@ -16,11 +16,9 @@ class Survey(models.Model):
     )
 
     owner = models.ForeignKey(
-        User,
-        related_name='surveys',
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True
+    User,
+    related_name='surveys',
+    on_delete=models.CASCADE
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
