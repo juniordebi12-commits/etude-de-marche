@@ -112,15 +112,30 @@ def survey_summary(request, survey_id):
             labels, values = [], []
             for choice in question.choices.all():
                 labels.append(choice.text)
-                count = Response.objects.filter(question=question, selected_choices=choice).count()
+                count = Response.objects.filter(
+                    question=question,
+                    selected_choices=choice
+                ).count()
                 values.append(count)
             entry["labels"], entry["data"] = labels, values
         else:
-            answers = Response.objects.filter(question=question).values_list('answer_text', flat=True)
+            answers = Response.objects.filter(
+                question=question
+            ).values_list('answer_text', flat=True)
             entry["answers"] = [a for a in answers if a and str(a).strip()]
+
         chart_data.append(entry)
 
-    respondents_qs = Respondent.objects.filter(survey=survey).order_by('-created_at')
+    # 🔧 AJUSTEMENT MINIMAL ICI
+    if request.user.is_staff or request.user.is_superuser:
+        respondents_qs = Respondent.objects.filter(
+            survey=survey
+        ).order_by('-created_at')
+    else:
+        respondents_qs = Respondent.objects.filter(
+            survey=survey,
+            created_by=request.user
+        ).order_by('-created_at')
 
     context = {
         "survey": survey,
@@ -129,28 +144,26 @@ def survey_summary(request, survey_id):
         "qr_code": generate_qr_for_survey(request, survey),
     }
 
-    # Sécurisation de la génération du WordCloud
     text_answers = [
-        r.answer_text.strip() for r in Response.objects.filter(
-            question__survey=survey, question__question_type='text'
-        ) if r.answer_text and r.answer_text.strip()
+        r.answer_text.strip()
+        for r in Response.objects.filter(
+            question__survey=survey,
+            question__question_type='text'
+        )
+        if r.answer_text and r.answer_text.strip()
     ]
 
     if text_answers:
-        try:
-            wc_image, top_words = generate_wordcloud_and_stats(text_answers)
-            if wc_image:
-                context["wordcloud_img"] = f"data:image/png;base64,{wc_image}"
-                context["top_words"] = top_words
-        except ValueError:
-            # Évite le crash complet si aucun mot valide
-            context["wordcloud_img"] = None
-            context["top_words"] = []
+        wc_image, top_words = generate_wordcloud_and_stats(text_answers)
+        if wc_image:
+            context["wordcloud_img"] = f"data:image/png;base64,{wc_image}"
+            context["top_words"] = top_words
     else:
         context["wordcloud_img"] = None
         context["top_words"] = []
 
     return render(request, "survey/survey_summary.html", context)
+
 
 
 
@@ -271,7 +284,8 @@ def take_survey(request, survey_id):
 
         respondent = Respondent.objects.create(
             survey=survey,
-            interviewer_name=interviewer_name
+            interviewer_name=interviewer_name,
+            created_by=request.user if request.user.is_authenticated else None
         )
 
         for question in questions:
