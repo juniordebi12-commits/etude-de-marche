@@ -45,14 +45,18 @@ class SurveyViewSet(viewsets.ModelViewSet):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        owner_flag = self.request.query_params.get("owner", None)
-        if owner_flag is not None and owner_flag.lower() in ("true", "1"):
-            if self.request.user and self.request.user.is_authenticated:
-                qs = qs.filter(owner=self.request.user)
-            else:
-                qs = qs.none()
-        return qs
+        user = self.request.user
+
+    # Admin : voit tout
+        if user.is_authenticated and (user.is_staff or user.is_superuser):
+            return Survey.objects.all()
+
+    # Utilisateur normal : voit SEULEMENT ses enquêtes
+        if user.is_authenticated:
+            return Survey.objects.filter(owner=user)
+
+    # Public : rien
+        return Survey.objects.none()
 
     def get_serializer(self, *args, **kwargs):
         """
