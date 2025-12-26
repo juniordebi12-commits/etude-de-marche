@@ -363,6 +363,7 @@ def mobile_sync_respondent(request):
                 synced_at=timezone.now(),
                 device_id=device_id,
                 app_version=app_version,
+                created_by=request.user if request.user.is_authenticated else None
             )
 
         # create answers
