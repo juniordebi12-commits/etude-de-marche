@@ -104,13 +104,7 @@ def survey_create(request):
 def survey_summary(request, survey_id):
     survey = get_survey_or_404(request, survey_id)
 
-    if request.user.is_staff or request.user.is_superuser:
-        respondents_qs = Respondent.objects.filter(survey=survey)
-    else:
-        respondents_qs = Respondent.objects.filter(
-            survey=survey,
-            created_by=request.user
-        )
+    respondents_qs = Respondent.objects.filter(survey=survey)
 
     chart_data = []
     for question in survey.questions.all():

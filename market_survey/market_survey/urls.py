@@ -10,6 +10,7 @@ urlpatterns = [
 
     # expose the standard Django auth views (login/logout/password change)
     # This makes reverse('logout') and {% url 'logout' %} work.
+    path("", include("django.contrib.auth.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
 
     # If you also have an accounts app exposing API endpoints (register/me/token),
