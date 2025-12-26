@@ -126,9 +126,16 @@ class ResponseViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+
+        if self.request.user.is_authenticated:
+            qs = qs.filter(question__survey__owner=self.request.user)
+        else:
+            qs = qs.none()
+
         survey_id = self.request.query_params.get("survey", None)
         if survey_id:
             qs = qs.filter(question__survey__id=survey_id)
+
         return qs
 
     def perform_create(self, serializer):
@@ -242,16 +249,19 @@ def me_view(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def dashboard_summary(request):
-    """
-    Returns global dashboard stats:
-      - total_surveys
-      - total_responses
-      - top_surveys
-    """
-    total_surveys = Survey.objects.count()
-    total_responses = SurveyResponse.objects.count()
+    user = request.user
 
-    qs = Survey.objects.annotate(responses=Count("questions__responses")).order_by("-responses")[:10]
+    total_surveys = Survey.objects.filter(owner=user).count()
+
+    total_responses = SurveyResponse.objects.filter(
+        question__survey__owner=user
+    ).count()
+
+    qs = (
+        Survey.objects.filter(owner=user)
+        .annotate(responses=Count("questions__responses"))
+        .order_by("-responses")[:10]
+    )
 
     top = []
     for s in qs:
