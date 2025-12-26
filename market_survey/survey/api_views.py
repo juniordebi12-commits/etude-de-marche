@@ -164,12 +164,16 @@ class ResponseViewSet(viewsets.ModelViewSet):
                     survey=survey_ref,
                     interviewer_name=resp_data.get("interviewer_name") or resp_data.get("name") or "",
                     participant_name=resp_data.get("participant_name", "") or "",
+                    created_by=survey_ref.owner if survey_ref else None
                 )
                 serializer.save(respondent=respondent_obj)
                 return
 
             # default: serializer handles respondent_id / respondent_data
-            serializer.save()
+            question = serializer.validated_data.get("question")
+            survey_owner = question.survey.owner if question and question.survey else None
+
+            serializer.save(created_by=survey_owner)        
             return
 
     @action(detail=False, methods=["post"], permission_classes=[IsAuthenticatedOrReadOnly])
@@ -383,6 +387,7 @@ def mobile_sync_respondent(request):
                 respondent=respondent,
                 question=question,
                 answer_text=answer_text,
+                created_by=survey.owner
             )
 
             if selected_choices_ids:
