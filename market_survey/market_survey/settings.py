@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import dj_database_url
 load_dotenv()
 
 
@@ -105,14 +106,9 @@ WSGI_APPLICATION = 'market_survey.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "sanametrics_db",
-        "USER": "sanametrics_user",
-        "PASSWORD": "Junior472002",
-        "HOST": "localhost",
-        "PORT": "5432",
-    }
+    "default": dj_database_url.parse(
+        os.environ.get("DATABASE_URL")
+    )
 }
 
 
