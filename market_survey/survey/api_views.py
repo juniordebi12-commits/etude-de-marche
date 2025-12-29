@@ -346,11 +346,7 @@ def mobile_sync_respondent(request):
             # update existing
             respondent.interviewer_name = interviewer_name
             respondent.participant_name = participant_name
-            respondent.updated_at_local = updated_at_local
             respondent.status = "synced"
-            respondent.synced_at = timezone.now()
-            respondent.device_id = device_id
-            respondent.app_version = app_version
             respondent.save()
 
             # remove old answers
@@ -363,10 +359,6 @@ def mobile_sync_respondent(request):
                 participant_name=participant_name,
                 client_uuid=client_uuid,
                 status="synced",
-                updated_at_local=updated_at_local,
-                synced_at=timezone.now(),
-                device_id=device_id,
-                app_version=app_version,
                 created_by=request.user if request.user.is_authenticated else None
             )
 

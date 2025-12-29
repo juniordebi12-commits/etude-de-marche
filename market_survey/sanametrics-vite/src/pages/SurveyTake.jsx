@@ -261,34 +261,44 @@ export default function SurveyTake() {
   }
 
   async function handleSubmit(e) {
-    e.preventDefault();
-    if (!survey) return;
-    if (!validateBeforeSubmit()) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const pendingPayload = buildInterviewPayload("pending");
-      if (!pendingPayload) throw new Error("Impossible de construire le payload d'enquête.");
-      upsertLocalInterview(pendingPayload);
-      setInterviewStatus("pending");
-      try {
-        await runSync();
-        if (navigator.onLine) setInterviewStatus("synced");
-        else setInterviewStatus("pending");
-      } catch (syncErr) {
-        console.warn("Erreur pendant la synchro immédiate", syncErr);
-        setInterviewStatus("error");
-      }
-      alert(navigator.onLine ? "Merci — réponses envoyées (ou en cours de synchro) !" : "Réponses enregistrées localement. Elles seront synchronisées plus tard.");
-      nav(`/surveys/${id}/thanks`);
-    } catch (err) {
-      console.error("submit answers error", err);
-      setError(err?.message || String(err));
-      setInterviewStatus("error");
-    } finally {
-      setSubmitting(false);
+  e.preventDefault();
+  if (!survey) return;
+  if (!validateBeforeSubmit()) return;
+
+  setSubmitting(true);
+  setError(null);
+
+  try {
+    const payload = buildInterviewPayload("pending");
+    if (!payload) throw new Error("Payload invalide");
+
+    // ✅ ENVOI DIRECT AU BACKEND (LA PIÈCE MANQUANTE)
+    const res = await fetch(`${API_BASE}/api/mobile/sync/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(access ? { Authorization: `Bearer ${access}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
     }
+
+    setInterviewStatus("synced");
+    alert("Merci — réponses enregistrées !");
+    nav(`/surveys/${id}/thanks`);
+  } catch (err) {
+    console.error(err);
+    setError("Erreur lors de l'envoi des réponses");
+    setInterviewStatus("error");
+  } finally {
+    setSubmitting(false);
   }
+}
+
 
   if (loading) return <div className="container py-8">Chargement...</div>;
   if (!survey) return <div className="container py-8 section-card">Enquête introuvable.</div>;
