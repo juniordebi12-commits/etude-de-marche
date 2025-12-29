@@ -105,9 +105,13 @@ WSGI_APPLICATION = 'market_survey.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "sanametrics_db",
+        "USER": "sanametrics_user",
+        "PASSWORD": "Junior472002",
+        "HOST": "localhost",
+        "PORT": "5432",
     }
 }
 
