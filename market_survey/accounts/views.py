@@ -10,7 +10,6 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
 
-
 class RegisterView(generics.CreateAPIView):
     """
     Endpoint d'inscription:
