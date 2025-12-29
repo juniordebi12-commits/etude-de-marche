@@ -1,10 +1,23 @@
 # accounts/views.py
 from rest_framework import generics, permissions
 from .serializers import UserSerializer, RegisterSerializer
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model,logout
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import EmailOrUsernameTokenSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.views import View
+from django.shortcuts import redirect
+
+
+
 
 User = get_user_model()
+
+class LogoutView(View):
+    def get(self, request):
+        logout(request)
+        return redirect("/")
 
 
 class RegisterView(generics.CreateAPIView):
@@ -73,3 +86,20 @@ class MeView(generics.RetrieveAPIView):
             "credits_balance": billing.balance if billing else 0,
         }
         return Response(data)
+    
+class EmailOrUsernameTokenView(TokenObtainPairView):
+    serializer_class = TokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        # on valide email/username
+        serializer = EmailOrUsernameTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data["user"]
+
+        # on génère le token JWT
+        token = TokenObtainPairSerializer.get_token(user)
+
+        return Response({
+            "refresh": str(token),
+            "access": str(token.access_token),
+        })
