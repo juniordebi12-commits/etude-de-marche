@@ -1,23 +1,14 @@
 # accounts/views.py
 from rest_framework import generics, permissions
 from .serializers import UserSerializer, RegisterSerializer
-from django.contrib.auth import get_user_model,logout
+from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import EmailOrUsernameTokenSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from django.views import View
-from django.shortcuts import redirect
-
-
 
 
 User = get_user_model()
-
-class LogoutView(View):
-    def get(self, request):
-        logout(request)
-        return redirect("/")
 
 
 class RegisterView(generics.CreateAPIView):
