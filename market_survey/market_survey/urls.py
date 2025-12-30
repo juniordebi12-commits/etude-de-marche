@@ -19,6 +19,7 @@ urlpatterns = [
 
     path("api/billing/", include("billing.urls")),
 
+    path("api/", include("feedback.urls")),
 
     # Survey app (routes UI + API defined in survey/urls.py)
     path("", include("survey.urls")),

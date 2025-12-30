@@ -5,6 +5,7 @@ import { Routes, Route } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import AdminRoute from "./components/AdminRoute";
+import FeedbackWidget from "./components/FeedbackWidget";
 
 // Pages
 import Home from "./pages/Home";
@@ -56,6 +57,7 @@ export default function App() {
       <Header />
 
       <main className="flex-grow">
+        <FeedbackWidget />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/features" element={<Features />} />

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'survey',
     'billing',
     'accounts',
+    "feedback",
     'rest_framework',
     'rest_framework.authtoken', 
     'corsheaders',
