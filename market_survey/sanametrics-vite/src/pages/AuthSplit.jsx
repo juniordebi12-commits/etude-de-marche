@@ -231,7 +231,7 @@ export default function AuthSplit() {
                   onChange={(e) =>
                     setRegisterForm({ ...registerForm, email: e.target.value })
                   }
-                  placeholder="Email (optionnel)"
+                  placeholder="Email"
                   className="w-full p-3 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand,#4f46e5)] focus:border-transparent"
                 />
                 <input
