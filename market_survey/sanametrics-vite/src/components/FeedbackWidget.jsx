@@ -1,45 +1,56 @@
 import { useState } from "react";
 
+const FEEDBACK_API = import.meta.env.DEV
+  ? "http://127.0.0.1:8000/api/feedback/"
+  : "https://etude-de-marche.onrender.com/api/feedback/";
+
 const FeedbackWidget = () => {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("idea");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
 
   const submitFeedback = async () => {
     if (!message.trim()) return;
 
     setLoading(true);
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/feedback/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(localStorage.getItem("access")
-              ? { Authorization: `Bearer ${localStorage.getItem("access")}` }
-              : {}),
-          },
-          body: JSON.stringify({
-            type,
-            message,
-            page: window.location.pathname,
-          }),
-        }
-      );
+    setError(null);
 
-      if (res.ok) {
-        setSuccess(true);
-        setMessage("");
-        setTimeout(() => {
-          setOpen(false);
-          setSuccess(false);
-        }, 1500);
+    try {
+      // 🔑 TOKEN JWT (TON NOM EXACT)
+      const token = localStorage.getItem("sana_access");
+
+      const response = await fetch(FEEDBACK_API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          type,
+          message,
+          page: window.location.pathname,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`HTTP ${response.status} – ${text}`);
       }
+
+      // ✅ Succès
+      setSuccess(true);
+      setMessage("");
+
+      setTimeout(() => {
+        setOpen(false);
+        setSuccess(false);
+      }, 1500);
     } catch (err) {
-      console.error("Erreur feedback", err);
+      console.error("❌ Erreur feedback :", err);
+      setError("Impossible d’envoyer le feedback.");
     } finally {
       setLoading(false);
     }
@@ -93,10 +104,16 @@ const FeedbackWidget = () => {
 
             {success ? (
               <p style={{ color: "green" }}>
-                Merci pour votre retour 🙏
+                Merci pour votre retour 
               </p>
             ) : (
               <>
+                {error && (
+                  <p style={{ color: "red", marginBottom: "8px" }}>
+                    {error}
+                  </p>
+                )}
+
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
