@@ -217,17 +217,6 @@ export default function SurveyThanks() {
           </div>
         </div>
       </div>
-
-      {/* additional note below card (not included in capture) */}
-      <div className="mt-4 text-xs text-muted">
-        <strong>Note :</strong> la génération de PDF se fait à la demande. Si tu veux générer des PDF en masse (ex. centaines),
-        fais-le côté serveur pour éviter des charges client lourdes.
-      </div>
-
-      <div className="mt-6 text-sm">
-        Si tu veux une version plus brandée (logo, couleurs supplémentaires, envoi d’email automatique ou PDF custom),
-        je te prépare le template et le workflow (ex : envoi via API backend) — dis-moi ce que tu préfères et j’implémente demain.
-      </div>
     </div>
   );
 }
