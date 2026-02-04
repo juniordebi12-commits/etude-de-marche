@@ -8,10 +8,6 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
-if (!API_BASE) {
-  throw new Error("VITE_API_URL non définie");
-}
-
 async function syncOne(interview) {
   const url = `${API_BASE}/api/mobile/sync/`;
 
