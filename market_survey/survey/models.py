@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 import uuid
+from cloudinary.models import CloudinaryField
 
 User = get_user_model()
 
@@ -9,10 +10,10 @@ class Survey(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
 
-    image = models.ImageField(
-        upload_to="survey_images/",
-        null=True,
-        blank=True
+    image = CloudinaryField(
+        "survey_image",
+        blank=True,
+        null=True
     )
 
     owner = models.ForeignKey(

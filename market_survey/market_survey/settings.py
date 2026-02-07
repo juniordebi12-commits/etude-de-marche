@@ -53,7 +53,9 @@ INSTALLED_APPS = [
     'rest_framework.authtoken', 
     'corsheaders',
     "django_filters",
-    "rest_framework_simplejwt.token_blacklist", 
+    "rest_framework_simplejwt.token_blacklist",
+    "cloudinary",
+    "cloudinary_storage", 
 ]
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -189,8 +191,7 @@ LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/login/"
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 BILLING_DEFAULT_CREDITS = {"free": 0, "pro": 25000, "team": 200000}
 BILLING_PACKS = [
@@ -198,5 +199,11 @@ BILLING_PACKS = [
     {"id": "c2", "name": "Pack Pro", "credits": 25000, "price": "19 900 FCFA"},
     {"id": "c3", "name": "Pack Volume", "credits": 120000, "price": "79 900 FCFA"},
 ]
+
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME"),
+    "API_KEY": os.getenv("CLOUDINARY_API_KEY"),
+    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET"),
+}
 
 MOCK_OPENAI = True

@@ -2,6 +2,7 @@
 from django.db import transaction
 from rest_framework import serializers
 from .models import Survey, Question, Choice, Response, Respondent
+from cloudinary.models import CloudinaryField
 
 # -------------------------
 # Choice / Question / Survey
@@ -28,7 +29,7 @@ class SurveySerializer(serializers.ModelSerializer):
     owner = serializers.ReadOnlyField(source="owner.username")
 
     # Champ image (upload + URL)
-    image = serializers.ImageField(read_only=False, required=False, allow_null=True)
+    image = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Survey
