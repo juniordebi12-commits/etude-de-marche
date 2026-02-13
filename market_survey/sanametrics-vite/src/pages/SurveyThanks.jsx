@@ -149,7 +149,11 @@ export default function SurveyThanks() {
       <div className="section-card" ref={receiptRef} style={{ borderTop: `4px solid var(--brand)` }}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold">Merci !</h1>
+            <h1 className="text-3xl font-extrabold text-slate-900">
+              {passedRespondent?.interviewer_name === "Réponse en ligne" 
+                ? "Merci pour votre participation !" 
+                : "Enregistré avec succès !"}
+            </h1>
             <p className="text-sm text-muted mt-2">
               {loadingTitle ? "Enregistrement..." : (surveyTitle ? `Vos réponses pour : ${surveyTitle}` : `Enquête #${id}`)}
             </p>
@@ -203,17 +207,58 @@ export default function SurveyThanks() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="text-xs text-muted">Redirection automatique vers le dashboard dans :</div>
-            <div className="font-semibold">{countdown}s</div>
-            <button
-              onClick={() => setAutoRedirectEnabled(false)}
-              className="px-3 py-1 border rounded btn-outline"
-              title="Annuler la redirection automatique"
-            >
-              Annuler
-            </button>
-            <Link to={`/surveys/${id}/take`}className="px-3 py-1 btn-outline">Continuer</Link>
-            <button onClick={() => nav(`/dashboard/survey/${id}`)} className="px-3 py-1 btn-primary">Voir les résultats</button>
+            {autoRedirectEnabled && (
+              <div className="flex items-center gap-2 mr-2">
+                <div className="text-xs text-muted hidden sm:block italic">Redirection dans :</div>
+                <div className="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full font-bold text-sm">
+                  {countdown}
+                </div>
+                <button
+                  onClick={() => setAutoRedirectEnabled(false)}
+                  className="text-[10px] uppercase tracking-wider font-bold text-red-500 hover:text-red-700 underline"
+                >
+                  Arrêter
+                </button>
+              </div>
+            )}
+
+            {/* Actions selon le profil (Public vs Connecté) */}
+            {access ? (
+              <div className="flex gap-2">
+                <Link to={`/surveys/${id}/take`} className="px-4 py-2 border rounded hover:bg-slate-50 text-sm font-medium">
+                  Nouvelle saisie
+                </Link>
+                <button 
+                  onClick={() => nav(`/dashboard/survey/${id}`)} 
+                  className="px-4 py-2 bg-slate-900 text-white rounded hover:bg-slate-800 text-sm font-medium"
+                >
+                  Voir les résultats
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                {/* Bouton Quitter : Ferme l'onglet ou redirige vers Google si on ne peut pas fermer */}
+                <button 
+                  onClick={() => {
+                    if (window.history.length <= 1) {
+                      window.close();
+                    } else {
+                      window.location.href = "https://www.google.com";
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg transition-colors"
+                >
+                  Quitter
+                </button>
+
+                <Link 
+                  to={`/surveys/${id}/take`} 
+                  className="px-6 py-2 bg-[var(--brand)] text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-all"
+                >
+                  Refaire l'enquête
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

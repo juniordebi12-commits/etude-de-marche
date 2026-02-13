@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .models import Survey, Question, Choice, Respondent, Response
 from openpyxl import Workbook
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse, FileResponse,JsonResponse
 import json
 import qrcode
 from io import BytesIO
@@ -263,22 +263,24 @@ def survey_detail(request, survey_id):
     return render(request, 'survey/detail.html', {'survey': survey, 'questions': questions})
 
 def take_survey(request, survey_id):
+    # On récupère le sondage (vue publique, pas besoin d'être owner)
     survey = get_public_survey_or_404(survey_id)
     questions = survey.questions.all()
 
     if request.method == "POST":
+        # On récupère le nom de l'enquêteur. 
+        # Si vide (cas du lien public), on met "Réponse en ligne"
         interviewer_name = request.POST.get('interviewer_name', '').strip()
         if not interviewer_name:
-            return render(request, 'survey/take_survey.html', {
-                'survey': survey,
-                'questions': questions,
-                'error': "Le nom de l'enquêteur est requis."
-            })
+            interviewer_name = "Réponse en ligne"
 
+        # Création du répondant
         respondent = Respondent.objects.create(
             survey=survey,
             interviewer_name=interviewer_name,
-            created_by=request.user if request.user.is_authenticated else None
+            # Très important : on lie la réponse au compte de celui qui a créé le sondage
+            # même si le répondant n'est pas connecté
+            created_by=survey.owner 
         )
 
         for question in questions:
@@ -287,14 +289,14 @@ def take_survey(request, survey_id):
             if question.question_type in ['single', 'multiple']:
                 selected_choices = request.POST.getlist(field_name)
                 if selected_choices:
-                    response = Response.objects.create(
+                    response_obj = Response.objects.create(
                         respondent=respondent,
                         question=question
                     )
                     for choice_id in selected_choices:
                         try:
                             choice = Choice.objects.get(id=int(choice_id))
-                            response.selected_choices.add(choice)
+                            response_obj.selected_choices.add(choice)
                         except (Choice.DoesNotExist, ValueError):
                             continue
             else:
@@ -306,6 +308,15 @@ def take_survey(request, survey_id):
                         answer_text=answer_text
                     )
 
+        # Si c'est une requête API (venant de React), on renvoie du JSON
+        if request.headers.get('Content-Type') == 'application/json' or request.path.startswith('/api/'):
+             return JsonResponse({
+                 "status": "success", 
+                 "respondent_id": respondent.id,
+                 "interviewer_name": interviewer_name
+             })
+
+        # Sinon, rendu classique Django (fallback)
         return render(request, 'survey/thanks.html', {'survey': survey})
 
     return render(request, 'survey/take_survey.html', {

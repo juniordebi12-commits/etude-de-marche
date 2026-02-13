@@ -261,43 +261,57 @@ export default function SurveyTake() {
   }
 
   async function handleSubmit(e) {
-  e.preventDefault();
-  if (!survey) return;
-  if (!validateBeforeSubmit()) return;
+    e.preventDefault();
+    if (!survey) return;
+    if (!validateBeforeSubmit()) return;
 
-  setSubmitting(true);
-  setError(null);
+    setSubmitting(true);
+    setError(null);
 
-  try {
-    const payload = buildInterviewPayload("pending");
-    if (!payload) throw new Error("Payload invalide");
+    // On détermine si c'est un lien public (pas de token d'accès)
+    const isPublicUser = !access;
 
-    // ✅ ENVOI DIRECT AU BACKEND (LA PIÈCE MANQUANTE)
-    const res = await fetch(`${API_BASE}/api/mobile/sync/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(access ? { Authorization: `Bearer ${access}` } : {}),
-      },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const payload = buildInterviewPayload("pending");
+      if (!payload) throw new Error("Payload invalide");
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err);
+      const res = await fetch(`${API_BASE}/api/mobile/sync/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(access ? { Authorization: `Bearer ${access}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+
+      setInterviewStatus("synced");
+
+      // ✅ REDIRECTION INTELLIGENTE
+      // On passe 'isPublic' dans le state pour que SurveyThanks sache quoi cacher
+      nav(`/surveys/${id}/thanks`, { 
+        state: { 
+          answers: payload.answers, 
+          respondent: {
+            interviewer_name: payload.interviewer_name || (isPublicUser ? "Réponse en ligne" : ""),
+            participant_name: payload.participant_name
+          },
+          isPublic: isPublicUser // <--- Le drapeau magique est ici
+        } 
+      });
+
+    } catch (err) {
+      console.error(err);
+      setError("Erreur lors de l'envoi des réponses");
+      setInterviewStatus("error");
+    } finally {
+      setSubmitting(false);
     }
-
-    setInterviewStatus("synced");
-    alert("Merci — réponses enregistrées !");
-    nav(`/surveys/${id}/thanks`);
-  } catch (err) {
-    console.error(err);
-    setError("Erreur lors de l'envoi des réponses");
-    setInterviewStatus("error");
-  } finally {
-    setSubmitting(false);
   }
-}
 
 
   if (loading) return <div className="container py-8">Chargement...</div>;

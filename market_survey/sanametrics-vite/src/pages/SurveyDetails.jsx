@@ -391,7 +391,15 @@ export default function SurveyDetails() {
             {respondents.map(r => (
               <div key={String(r.id)} className="flex items-center justify-between p-3 bg-[var(--card)] rounded border">
                 <div>
-                  <div className="font-medium">{r.interviewer_name || `Enquêteur #${r.id}`}</div>
+                  <div className="font-medium flex items-center gap-2">
+                    {r.interviewer_name || `Enquêteur #${r.id}`}
+                    {/* Ajout de la pastille "Public" si c'est une réponse via WhatsApp/Web */}
+                    {r.interviewer_name === "Réponse en ligne" && (
+                      <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full uppercase font-bold border border-blue-200">
+                        Public
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted">{r.participant_name ? `Participant: ${r.participant_name}` : ""}</div>
                   <div className="text-xs text-muted mt-1">Date: {r.created_at ? new Date(r.created_at).toLocaleString() : "-"}</div>
                 </div>

@@ -56,7 +56,7 @@ class SurveyViewSet(viewsets.ModelViewSet):
             return Survey.objects.filter(owner=user)
 
     # Public : rien
-        return Survey.objects.none()
+        return Survey.objects.all()
 
     def get_serializer(self, *args, **kwargs):
         """
@@ -130,7 +130,7 @@ class ResponseViewSet(viewsets.ModelViewSet):
         if self.request.user.is_authenticated:
             qs = qs.filter(question__survey__owner=self.request.user)
         else:
-            qs = qs.none()
+            qs = qs.all()
 
         survey_id = self.request.query_params.get("survey", None)
         if survey_id:
@@ -292,22 +292,11 @@ def dashboard_summary(request):
 # Endpoint for mobile/offline sync
 # -------------------------------------------------
 @api_view(["POST"])
-@permission_classes([permissions.AllowAny])  # change to IsAuthenticated if you want auth
+@permission_classes([permissions.AllowAny])
 def mobile_sync_respondent(request):
     """
-    Receives a full interview (1 Respondent + answers) from frontend (offline mode).
-
-    Expected JSON:
-    {
-      "client_uuid": "...",
-      "survey_id": 1,
-      "interviewer_name": "...",
-      "participant_name": "...",
-      "updated_at_local": "...",
-      "device_id": "...",
-      "app_version": "...",
-      "answers": [ { "question_id": 3, "answer_text": "", "selected_choices": [5,6] } ]
-    }
+    Reçoit une interview complète. 
+    Le nom de l'interviewer est automatiquement forcé avec le nom du propriétaire de l'enquête.
     """
     ser = RespondentSyncSerializer(data=request.data)
     if not ser.is_valid():
@@ -316,23 +305,25 @@ def mobile_sync_respondent(request):
     data = ser.validated_data
     client_uuid = data["client_uuid"]
     survey_id = data["survey_id"]
-    interviewer_name = data["interviewer_name"]
     participant_name = data.get("participant_name", "")
     updated_at_local = data["updated_at_local"]
-    device_id = data.get("device_id", "")
-    app_version = data.get("app_version", "")
     answers_payload = data["answers"]
 
     try:
-        survey = Survey.objects.get(id=survey_id)
+        # On récupère l'enquête pour accéder à son propriétaire (owner)
+        survey = Survey.objects.select_related('owner').get(id=survey_id)
     except Survey.DoesNotExist:
         return Response({"survey_id": ["Survey introuvable."]}, status=status.HTTP_400_BAD_REQUEST)
 
+    # --- LOGIQUE D'IDENTIFICATION AUTOMATIQUE ---
+    # On utilise le username du créateur du lien comme nom de collecteur
+    auto_interviewer_name = survey.owner.username if survey.owner else "Anonyme"
+
     with transaction.atomic():
         try:
+            # On cherche si ce répondant existe déjà (cas de mise à jour/synchro multiple)
             respondent = Respondent.objects.select_for_update().get(client_uuid=client_uuid, survey=survey)
 
-            # Last-write-wins policy
             if respondent.updated_at_local and respondent.updated_at_local >= updated_at_local:
                 return Response(
                     {
@@ -343,26 +334,27 @@ def mobile_sync_respondent(request):
                     status=status.HTTP_200_OK,
                 )
 
-            # update existing
-            respondent.interviewer_name = interviewer_name
+            # Mise à jour de l'existant
+            respondent.interviewer_name = auto_interviewer_name
             respondent.participant_name = participant_name
             respondent.status = "synced"
             respondent.save()
 
-            # remove old answers
+            # Nettoyage des anciennes réponses pour ré-écriture
             SurveyResponse.objects.filter(respondent=respondent).delete()
 
         except Respondent.DoesNotExist:
+            # Création du nouveau répondant avec le nom forcé
             respondent = Respondent.objects.create(
                 survey=survey,
-                interviewer_name=interviewer_name,
+                interviewer_name=auto_interviewer_name,
                 participant_name=participant_name,
                 client_uuid=client_uuid,
                 status="synced",
-                created_by=request.user if request.user.is_authenticated else None
+                created_by=survey.owner  # On lie techniquement la réponse au compte du proprio
             )
 
-        # create answers
+        # Création des réponses associées
         for ans in answers_payload:
             qid = ans.get("question_id")
             answer_text = ans.get("answer_text", "") or ""
@@ -370,27 +362,26 @@ def mobile_sync_respondent(request):
 
             try:
                 question = Question.objects.get(id=qid, survey=survey)
+                answer_obj = SurveyResponse.objects.create(
+                    respondent=respondent,
+                    question=question,
+                    answer_text=answer_text,
+                    created_by=survey.owner
+                )
+
+                if selected_choices_ids:
+                    choices = Choice.objects.filter(id__in=selected_choices_ids, question=question)
+                    answer_obj.selected_choices.set(choices)
             except Question.DoesNotExist:
-                # ignore unknown question ids
-                logger.warning("mobile_sync: unknown question %s for survey %s", qid, survey_id)
+                logger.warning("mobile_sync: question %s non trouvée pour l'enquête %s", qid, survey_id)
                 continue
-
-            answer_obj = SurveyResponse.objects.create(
-                respondent=respondent,
-                question=question,
-                answer_text=answer_text,
-                created_by=survey.owner
-            )
-
-            if selected_choices_ids:
-                choices = Choice.objects.filter(id__in=selected_choices_ids, question=question)
-                answer_obj.selected_choices.set(choices)
 
     return Response(
         {
             "detail": "Synchro réussie",
             "respondent_id": respondent.id,
             "client_uuid": str(respondent.client_uuid),
+            "interviewer_assigned": auto_interviewer_name
         },
         status=status.HTTP_200_OK,
     )
