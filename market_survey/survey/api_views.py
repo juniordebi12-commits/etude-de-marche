@@ -126,17 +126,23 @@ class ResponseViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        user = self.request.user
 
-        if self.request.user.is_authenticated:
-            qs = qs.filter(question__survey__owner=self.request.user)
-        else:
-            qs = qs.all()
+        # ADMIN = TOUT VOIR
+        if user.is_authenticated and (user.is_staff or user.is_superuser):
+            pass  # aucun filtre
 
-        survey_id = self.request.query_params.get("survey", None)
+        # USER NORMAL = seulement ses enquêtes
+        elif user.is_authenticated:
+            qs = qs.filter(question__survey__owner=user)
+
+        # filtre optionnel par survey
+        survey_id = self.request.query_params.get("survey")
         if survey_id:
             qs = qs.filter(question__survey__id=survey_id)
 
         return qs
+
 
     def perform_create(self, serializer):
         """
