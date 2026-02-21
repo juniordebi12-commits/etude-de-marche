@@ -27,7 +27,7 @@ class QuestionSerializer(serializers.ModelSerializer):
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, required=False)
     owner = serializers.ReadOnlyField(source="owner.username")
-
+    has_responses = serializers.SerializerMethodField()
     # Champ image (upload + URL)
     image = serializers.ImageField(required=False, allow_null=True)
 
@@ -41,8 +41,11 @@ class SurveySerializer(serializers.ModelSerializer):
             "owner",
             "created_at",
             "updated_at",
+            "has_responses",
             "questions",
         ]
+    def get_has_responses(self, obj):
+        return obj.respondents.exists()
 
     def validate_questions(self, value):
         if value is None:
@@ -107,6 +110,9 @@ class SurveySerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         questions_data = validated_data.pop("questions", None)
+
+        if instance.respondents.exists():
+            questions_data = None
 
         with transaction.atomic():
             # champs simples

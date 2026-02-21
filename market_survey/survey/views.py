@@ -328,19 +328,28 @@ def take_survey(request, survey_id):
 
 def survey_edit(request, survey_id):
     survey = get_survey_or_404(request, survey_id)
+    
+    # 1. On vérifie s'il y a déjà des réponses
+    has_responses = survey.respondents.exists()
 
     if request.method == "POST":
+        # Le titre et la description sont toujours modifiables
         survey.title = request.POST.get("title", "").strip()
         survey.description = request.POST.get("description", "").strip()
         survey.save()
 
+        # 2. Si des réponses existent, on s'arrête ici pour les questions
+        if has_responses:
+            messages.warning(request, "Le titre a été mis à jour, mais les questions sont verrouillées car des réponses existent déjà.")
+            return redirect("survey_detail", survey_id=survey.id)
+
+        # 3. Si PAS de réponses, on procède à la modification complète (ton code actuel)
         # Mise à jour / suppression des questions existantes
         for question in survey.questions.all():
             text_key = f"question_text_existing_{question.id}"
             type_key = f"question_type_existing_{question.id}"
 
             if text_key not in request.POST:
-                # supprimée côté formulaire
                 question.delete()
                 continue
 
@@ -348,14 +357,13 @@ def survey_edit(request, survey_id):
             question.question_type = request.POST.get(type_key, question.question_type)
             question.save()
 
-            # récrée choix si nécessaire
             if question.question_type in ["single", "multiple"]:
                 question.choices.all().delete()
                 for c in request.POST.getlist(f"choices_existing_{question.id}[]"):
                     if c and c.strip():
                         Choice.objects.create(question=question, text=c.strip())
 
-        # nouvelles questions
+        # Nouvelles questions
         new_texts = request.POST.getlist("new_question_text[]")
         new_types = request.POST.getlist("new_question_type[]")
 
@@ -374,8 +382,11 @@ def survey_edit(request, survey_id):
 
         return redirect("survey_detail", survey_id=survey.id)
 
-    return render(request, "survey/survey_edit.html", {"survey": survey})
-
+    # On passe 'has_responses' au template pour pouvoir griser les champs en HTML
+    return render(request, "survey/survey_edit.html", {
+        "survey": survey, 
+        "has_responses": has_responses
+    })
 
 def survey_delete(request, survey_id):
     survey = get_survey_or_404(request, survey_id)

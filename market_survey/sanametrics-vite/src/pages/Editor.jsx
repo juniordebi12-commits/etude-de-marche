@@ -32,6 +32,7 @@ export default function Editor() {
 
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [hasResponses, setHasResponses] = useState(false);
 
   const nav = useNavigate();
 
@@ -81,6 +82,7 @@ export default function Editor() {
       .then((data) => {
         setTitle(data.title || "");
         setDescription(data.description || "");
+        setHasResponses(!!data.has_responses); //
         const qs = (data.questions || []).map((q) => ({
           id: q.id,
           text: q.text || "",
@@ -341,6 +343,12 @@ export default function Editor() {
       </div>
 
       {/* Questions */}
+      {hasResponses && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-sm rounded">
+          🔒 Cette enquête a déjà des réponses.  
+          Les questions sont verrouillées pour préserver les statistiques.
+        </div>
+      )}
       <div className="space-y-6">
         {questions.map((q, qi) => (
           <div
@@ -352,30 +360,40 @@ export default function Editor() {
                 Question {qi + 1}
               </div>
               <div className="flex gap-2">
+                {!hasResponses && (
                 <button
                   onClick={() => removeQuestion(qi)}
                   className="text-red-500 text-sm"
                 >
                   Supprimer
                 </button>
+              )}
               </div>
             </div>
 
             <input
               value={q.text}
-              onChange={(e) => updateQuestion(qi, { text: e.target.value })}
+              readOnly={hasResponses}
+              onChange={(e) =>
+                !hasResponses && updateQuestion(qi, { text: e.target.value })
+              }
+              className={`w-full p-2 mb-3 border rounded ${
+                hasResponses ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
               placeholder="Texte de la question"
-              className="w-full p-2 mb-3 border rounded"
             />
 
             <div className="mb-3">
               <select
-                value={q.question_type}
-                onChange={(e) =>
-                  updateQuestion(qi, { question_type: e.target.value })
-                }
-                className="p-2 border rounded"
-              >
+                  value={q.question_type}
+                  disabled={hasResponses}
+                  onChange={(e) =>
+                    updateQuestion(qi, { question_type: e.target.value })
+                  }
+                  className={`p-2 border rounded ${
+                    hasResponses ? "bg-gray-100 cursor-not-allowed" : ""
+                  }`}
+                >
                 <option value="text">Texte libre</option>
                 <option value="single">Choix unique</option>
                 <option value="multiple">Choix multiple</option>
@@ -390,27 +408,34 @@ export default function Editor() {
                   <div key={c.id ?? ci} className="flex gap-2 items-center">
                     <input
                       value={c.text}
+                      readOnly={hasResponses}
                       onChange={(e) =>
-                        updateChoice(qi, ci, e.target.value)
+                        !hasResponses && updateChoice(qi, ci, e.target.value)
                       }
-                      className="flex-1 p-2 border rounded"
+                      className={`flex-1 p-2 border rounded ${
+                        hasResponses ? "bg-gray-100 cursor-not-allowed" : ""
+                      }`}
                       placeholder={`Choix ${ci + 1}`}
                     />
-                    <button
-                      onClick={() => removeChoice(qi, ci)}
-                      className="px-2 py-1 text-sm"
-                    >
-                      ✕
-                    </button>
+                    {!hasResponses && (
+                      <button
+                        onClick={() => removeChoice(qi, ci)}
+                        className="px-2 py-1 text-sm"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
                 <div>
+                  {!hasResponses && (
                   <button
                     onClick={() => addChoice(qi)}
                     className="text-indigo-600 text-sm"
                   >
                     + Ajouter un choix
                   </button>
+                )}
                 </div>
               </div>
             )}
@@ -419,13 +444,15 @@ export default function Editor() {
       </div>
 
       <div className="mt-8 flex gap-4">
-        <button
-          onClick={addQuestion}
-          disabled={loading}
-          className="px-4 py-2 border rounded"
-        >
-          + Ajouter une question
-        </button>
+        {!hasResponses && (
+          <button
+            onClick={addQuestion}
+            disabled={loading}
+            className="px-4 py-2 border rounded"
+          >
+            + Ajouter une question
+          </button>
+        )}
         <button
           onClick={handleSave}
           disabled={loading}
