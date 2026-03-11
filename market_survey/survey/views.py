@@ -195,32 +195,48 @@ def export_survey_pdf(request, survey_id):
 
 def export_survey_excel(request, survey_id):
     survey = get_survey_or_404(request, survey_id)
+    # Récupération des répondants classés par date
     respondents = Respondent.objects.filter(survey=survey).order_by('-created_at')
 
     wb = Workbook()
     ws = wb.active
-    ws.title = f"Résumé - {survey.title}"
+    ws.title = "Données d'enquête"
 
-    ws.append(["Nom de l’enquêteur", "Date", "Question", "Réponse"])
+    # En-têtes sans l'ID unique
+    ws.append([
+        "Nom du Participant", 
+        "Enquêteur", 
+        "Date", 
+        "Question", 
+        "Réponse"
+    ])
 
     for respondent in respondents:
-        responses = Response.objects.filter(respondent=respondent).select_related('question')
+        # Optimisation pour récupérer les questions et les choix multiples d'un coup
+        responses = Response.objects.filter(respondent=respondent).select_related('question').prefetch_related('selected_choices')
+        
         for response in responses:
+            # Traitement des réponses selon le type de question
             if response.question.question_type in ["single", "multiple"]:
                 selected = ", ".join([c.text for c in response.selected_choices.all()])
                 answer = selected or "(Aucune sélection)"
             else:
                 answer = response.answer_text or "(Vide)"
 
+            # Ajout de la ligne avec participant_name
             ws.append([
+                respondent.participant_name or "Anonyme",
                 respondent.interviewer_name,
                 respondent.created_at.strftime("%d/%m/%Y %H:%M"),
                 response.question.text,
                 answer
             ])
 
+    # Figer la ligne du haut pour faciliter la lecture lors du scroll
+    ws.freeze_panes = 'A2'
+
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    filename = f"{survey.title}_résultats.xlsx"
+    filename = f"{survey.title}_export.xlsx"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     wb.save(response)
