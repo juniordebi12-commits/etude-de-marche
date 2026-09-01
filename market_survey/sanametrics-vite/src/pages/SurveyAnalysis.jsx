@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { useAuth } from "../api/useAuth";
 import { fetchSurveyAnalysis } from "../api/useDashboard";
 import SurveyCharts from "../components/SurveyCharts";
+import { consumeCredits } from "../api/useBilling";
 
 function formatNumber(value) {
   return new Intl.NumberFormat("fr-FR").format(value ?? 0);
@@ -131,8 +132,29 @@ export default function SurveyAnalysis() {
     };
   }, [data]);
 
-  function exportPdf() {
+  async function prepareProfessionalExport(format) {
+    const label = format === "excel" ? "Excel" : "PDF";
+
+    if (!window.confirm(`Télécharger le rapport ${label} coûtera 5 crédits. Continuer ?`)) {
+      return false;
+    }
+
+    try {
+      await consumeCredits(access, `export_${format}`, {
+        survey_id: id,
+        source: "survey_analysis",
+      });
+      return true;
+    } catch (exportError) {
+      alert(exportError.message || "Impossible de préparer cet export.");
+      return false;
+    }
+  }
+
+  async function exportPdf() {
     if (!data) return;
+
+    if (!(await prepareProfessionalExport("pdf"))) return;
 
     const surveyTitle = data.survey?.title || `Enquête ${id}`;
     const pdf = new jsPDF({ unit: "pt", format: "a4" });
@@ -236,8 +258,10 @@ export default function SurveyAnalysis() {
     pdf.save(`analyse_${safeFilename(surveyTitle)}.pdf`);
   }
 
-  function exportExcel() {
+  async function exportExcel() {
     if (!data) return;
+
+    if (!(await prepareProfessionalExport("excel"))) return;
 
     const surveyTitle = data.survey?.title || `Enquête ${id}`;
     const workbook = XLSX.utils.book_new();
@@ -383,7 +407,7 @@ export default function SurveyAnalysis() {
                 onClick={exportExcel}
                 className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
               >
-                Télécharger Excel
+                Télécharger Excel · 5 crédits
               </button>
 
               <button
@@ -391,7 +415,7 @@ export default function SurveyAnalysis() {
                 onClick={exportPdf}
                 className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700 transition hover:bg-rose-100"
               >
-                Télécharger PDF
+                Télécharger PDF · 5 crédits
               </button>
 
               <Link

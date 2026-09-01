@@ -10,8 +10,8 @@ const CREDIT_PACKS = [
     unitPrice: "100 FCFA / crédit",
     description: "Pour découvrir les fonctions IA de SanaMetrics.",
     examples: [
-      "Environ 5 questionnaires générés",
-      "Ou environ 3 analyses IA",
+      "2 questionnaires IA ou 2 exports",
+      "Ou 1 analyse IA",
       "Aucun abonnement",
     ],
   },
@@ -23,8 +23,8 @@ const CREDIT_PACKS = [
     unitPrice: "75 FCFA / crédit",
     description: "Pour les équipes qui collectent régulièrement.",
     examples: [
-      "Environ 20 questionnaires générés",
-      "Ou environ 13 analyses IA",
+      "8 questionnaires IA ou 8 exports",
+      "Ou 5 analyses IA",
       "25 % de crédits en plus",
     ],
   },
@@ -36,8 +36,8 @@ const CREDIT_PACKS = [
     unitPrice: "60 FCFA / crédit",
     description: "Le meilleur équilibre pour suivre plusieurs enquêtes.",
     examples: [
-      "Environ 50 questionnaires générés",
-      "Ou environ 33 analyses IA",
+      "20 questionnaires IA ou 20 exports",
+      "Ou 12 analyses IA",
       "Pack le plus avantageux",
     ],
     recommended: true,
@@ -50,8 +50,8 @@ const CREDIT_PACKS = [
     unitPrice: "48 FCFA / crédit",
     description: "Pour les organisations et équipes à fort volume.",
     examples: [
-      "Environ 125 questionnaires générés",
-      "Ou environ 83 analyses IA",
+      "50 questionnaires IA ou 50 exports",
+      "Ou 31 analyses IA",
       "Meilleur prix par crédit",
     ],
   },
@@ -153,9 +153,9 @@ export default function Pricing() {
           </h2>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-300">
-            Créer, partager, collecter et exporter vos enquêtes reste
-            disponible. Les crédits sont utilisés uniquement pour les fonctions
-            d’intelligence artificielle.
+            Créer, partager, collecter et consulter vos enquêtes reste
+            disponible. Les crédits servent à la génération IA, à l’analyse IA
+            et aux exports professionnels.
           </p>
         </div>
 
@@ -174,7 +174,7 @@ export default function Pricing() {
             </p>
 
             <h2 className="mt-2 text-xl font-bold text-white">
-              2 crédits par génération
+              5 crédits par génération
             </h2>
 
             <p className="mt-3 text-sm leading-7 text-slate-300">
@@ -190,13 +190,28 @@ export default function Pricing() {
             </p>
 
             <h2 className="mt-2 text-xl font-bold text-white">
-              À partir de 3 crédits par analyse
+              8 crédits par analyse
             </h2>
 
             <p className="mt-3 text-sm leading-7 text-slate-300">
               Choisissez une enquête et obtenez une synthèse lisible, les
               tendances importantes, les points d’attention et des
               recommandations concrètes.
+            </p>
+          </article>
+
+          <article className="rounded-2xl border border-slate-800 bg-slate-900 p-7">
+            <p className="text-sm font-semibold text-cyan-400">
+              Exports professionnels
+            </p>
+
+            <h2 className="mt-2 text-xl font-bold text-white">
+              5 crédits par export
+            </h2>
+
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              Téléchargez un rapport PDF ou un fichier Excel de vos résultats
+              et analyses, prêt à partager avec votre équipe.
             </p>
           </article>
         </div>
@@ -230,9 +245,9 @@ export default function Pricing() {
                 Puis-je utiliser SanaMetrics sans crédits ?
               </h3>
               <p className="mt-1 text-sm leading-6 text-slate-300">
-                Oui. Les crédits sont réservés aux fonctions IA. Vous pouvez
-                créer, collecter, consulter et exporter vos enquêtes sans
-                crédit.
+                Oui. Vous pouvez créer, collecter et consulter vos enquêtes
+                sans crédit. Les crédits servent aux fonctions IA et aux
+                exports professionnels PDF ou Excel.
               </p>
             </div>
 

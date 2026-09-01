@@ -233,8 +233,8 @@ export default function Billing() {
             Gérez les crédits de votre équipe.
           </h1>
           <p className="mt-4 text-base leading-7 text-slate-300">
-            Les crédits sont utilisés uniquement pour générer des questionnaires
-            et analyser vos enquêtes avec l’intelligence artificielle.
+            Les crédits servent à générer des questionnaires avec l’IA,
+            analyser vos enquêtes et télécharger des exports professionnels.
           </p>
         </header>
 
@@ -387,7 +387,7 @@ export default function Billing() {
                   </p>
                   <p className="mt-1">
                     Créez une première structure de questionnaire à partir de
-                    votre besoin.
+                    votre besoin. 5 crédits par génération.
                   </p>
                 </div>
 
@@ -397,7 +397,17 @@ export default function Billing() {
                   </p>
                   <p className="mt-1">
                     Obtenez une lecture claire des résultats, tendances et
-                    points d’attention.
+                    points d’attention. 8 crédits par analyse.
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-semibold text-cyan-300">
+                    Exports professionnels
+                  </p>
+                  <p className="mt-1">
+                    Téléchargez vos rapports PDF ou Excel. 5 crédits par
+                    fichier exporté.
                   </p>
                 </div>
               </div>
@@ -407,8 +417,8 @@ export default function Billing() {
               <h2 className="text-lg font-bold text-white">Important</h2>
               <p className="mt-3 text-sm leading-6 text-slate-400">
                 Les outils classiques restent accessibles : création,
-                collecte, dashboard et exports PDF ou Excel. Les crédits ne
-                servent qu’aux fonctionnalités d’intelligence artificielle.
+                collecte, dashboard et consultation. Les crédits servent aux
+                fonctionnalités IA et aux exports professionnels PDF ou Excel.
               </p>
             </div>
 
@@ -461,7 +471,6 @@ export default function Billing() {
                       <p className="font-semibold text-white">{item.label}</p>
                       <p className="mt-1 text-xs text-slate-500">
                         {formatDate(item.created_at)}
-                        {item.tokens > 0 ? ` · ${item.tokens} tokens` : ""}
                       </p>
                     </div>
 

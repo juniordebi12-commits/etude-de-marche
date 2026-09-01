@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { API_BASE } from "../api/useApi";
 import { useAuth } from "../api/useAuth";
 import { listSurveys } from "../api/useDashboard";
+import { consumeCredits } from "../api/useBilling";
 
 function normalizeList(data) {
   if (Array.isArray(data)) return data;
@@ -226,8 +227,29 @@ setAnalysisHistory((previous) => [
     }
   }
 
-  function downloadAnalysisPdf() {
+  async function prepareAnalysisExport(format) {
+    const label = format === "excel" ? "Excel" : "PDF";
+
+    if (!window.confirm(`Télécharger ce rapport ${label} coûtera 5 crédits. Continuer ?`)) {
+      return false;
+    }
+
+    try {
+      await consumeCredits(access, `export_${format}`, {
+        survey_id: analysis?.survey?.id || selectedSurvey?.id,
+        source: "ai_analysis",
+      });
+      return true;
+    } catch (exportError) {
+      alert(exportError.message || "Impossible de préparer cet export.");
+      return false;
+    }
+  }
+
+  async function downloadAnalysisPdf() {
     if (!analysis) return;
+
+    if (!(await prepareAnalysisExport("pdf"))) return;
 
     const surveyTitle =
       analysis.survey?.title || selectedSurvey?.title || "Analyse SanaMetrics";
@@ -338,8 +360,10 @@ setAnalysisHistory((previous) => [
     pdf.save(`analyse_ia_${safeFilename(surveyTitle)}.pdf`);
   }
 
-  function downloadAnalysisExcel() {
+  async function downloadAnalysisExcel() {
     if (!analysis) return;
+
+    if (!(await prepareAnalysisExport("excel"))) return;
 
     const surveyTitle =
       analysis.survey?.title || selectedSurvey?.title || "Analyse SanaMetrics";
@@ -604,7 +628,7 @@ setAnalysisHistory((previous) => [
                 >
                   {isAnalyzing
                     ? "Analyse en cours…"
-                    : "Lancer l’analyse IA"}
+                    : "Lancer l’analyse IA · 8 crédits"}
                 </button>
 
                 <button
@@ -701,7 +725,7 @@ setAnalysisHistory((previous) => [
                       onClick={downloadAnalysisExcel}
                       className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-500"
                     >
-                      Télécharger Excel
+                      Télécharger Excel · 5 crédits
                     </button>
 
                     <button
@@ -709,7 +733,7 @@ setAnalysisHistory((previous) => [
                       onClick={downloadAnalysisPdf}
                       className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-500"
                     >
-                      Télécharger PDF
+                      Télécharger PDF · 5 crédits
                     </button>
                   </div>
                 </div>

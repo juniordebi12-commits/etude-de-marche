@@ -225,7 +225,9 @@ Règles :
                 disabled={loading || !input.trim()}
                 className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {loading ? "Génération en cours…" : "Générer le questionnaire"}
+                {loading
+                  ? "Génération en cours…"
+                  : "Générer le questionnaire · 5 crédits"}
               </button>
             </div>
           </div>

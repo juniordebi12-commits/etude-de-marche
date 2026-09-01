@@ -6,6 +6,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from django.db import transaction
+
 from .models import BillingAccount, PurchaseRecord, Transaction
 from .serializers import RegisterSerializer
 
@@ -42,6 +44,20 @@ DEFAULT_CREDIT_PACKS = getattr(
         },
     ],
 )
+
+# Actions facturées par SanaMetrics. Les actions gratuites (création manuelle,
+# collecte, consultation) ne figurent volontairement pas dans cette liste.
+USAGE_CREDIT_COSTS = {
+    "export_pdf": 5,
+    "export_excel": 5,
+}
+
+USAGE_LABELS = {
+    "questionnaire": "Génération de questionnaire IA",
+    "analysis": "Analyse IA d’enquête",
+    "export_pdf": "Export PDF professionnel",
+    "export_excel": "Export Excel professionnel",
+}
 
 
 def get_account(user):
@@ -81,30 +97,45 @@ def history_view(request):
 
         if is_ai_usage:
             action = metadata.get("action", "ia")
-            labels = {
-                "questionnaire": "Génération de questionnaire",
-                "analysis": "Analyse d’enquête",
-                "ia": "Utilisation IA",
-            }
-
             ai_history.append(
                 {
                     "id": purchase.id,
                     "action": action,
-                    "label": labels.get(action, "Utilisation IA"),
+                    "label": USAGE_LABELS.get(action, "Utilisation IA"),
                     "credits": purchase.credits,
-                    "tokens": metadata.get("tokens", 0),
                     "status": purchase.status,
                     "created_at": purchase.created_at.isoformat(),
                 }
             )
+
+    def public_transaction_note(transaction):
+        note = transaction.note or ""
+
+        if note.startswith("Génération de questionnaire"):
+            return USAGE_LABELS["questionnaire"]
+        if note.startswith("Analyse d’enquête"):
+            return USAGE_LABELS["analysis"]
+        if note.startswith("Export PDF"):
+            return USAGE_LABELS["export_pdf"]
+        if note.startswith("Export Excel"):
+            return USAGE_LABELS["export_excel"]
+        if (
+            note.startswith("Usage IA")
+            or "tokens" in note.lower()
+            or "gpt-" in note.lower()
+        ):
+            # Anciennes transactions de test enregistrées avant le nettoyage
+            # des libellés publics.
+            return "Utilisation IA"
+
+        return note
 
     transactions = [
         {
             "id": transaction.id,
             "amount": transaction.amount,
             "type": transaction.type,
-            "note": transaction.note or "",
+            "note": public_transaction_note(transaction),
             "created_at": transaction.created_at.isoformat(),
         }
         for transaction in account.transactions.order_by("-created_at")[:30]
@@ -116,6 +147,64 @@ def history_view(request):
             "balance": account.get_balance(),
             "ai_history": ai_history,
             "transactions": transactions,
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def consume_credits_view(request):
+    """Débite une action professionnelle avant son exécution côté client."""
+    payload = request.data or {}
+    action = str(payload.get("action") or "")
+    credits = USAGE_CREDIT_COSTS.get(action)
+
+    if credits is None:
+        return Response(
+            {"ok": False, "error": "action_not_available"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    with transaction.atomic():
+        account = get_account(request.user)
+        account = BillingAccount.objects.select_for_update().get(pk=account.pk)
+
+        if account.get_balance() < credits:
+            return Response(
+                {
+                    "ok": False,
+                    "error": "Crédits insuffisants pour effectuer cet export.",
+                    "credits_required": credits,
+                    "balance": account.get_balance(),
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
+        account.withdraw(
+            credits,
+            reason=USAGE_LABELS[action],
+        )
+
+        PurchaseRecord.objects.create(
+            billing=account,
+            pack_id="usage:export",
+            credits=-credits,
+            amount_cents=0,
+            currency="XAF",
+            provider="sanametrics-export",
+            provider_data={
+                "action": action,
+                "survey_id": payload.get("survey_id"),
+                "source": payload.get("source", "application"),
+            },
+            status=PurchaseRecord.STATUS_COMPLETED,
+        )
+
+    return Response(
+        {
+            "ok": True,
+            "credits_used": credits,
+            "balance": account.get_balance(),
         }
     )
 

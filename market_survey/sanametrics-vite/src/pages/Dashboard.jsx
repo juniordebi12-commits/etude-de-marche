@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import DashboardCharts from "../components/DashboardCharts";
 import TopSurveysList from "../components/TopSurveysList";
 import { API_BASE } from "../api/useApi";
+import { consumeCredits } from "../api/useBilling";
 
 export default function Dashboard() {
   const { access } = useAuth();
@@ -66,6 +67,13 @@ async function downloadFilteredExport(format) {
     return;
   }
 
+  const formatLabel = format === "excel" ? "Excel" : "PDF";
+  const confirmed = window.confirm(
+    `Télécharger cet export ${formatLabel} coûtera 5 crédits. Continuer ?`
+  );
+
+  if (!confirmed) return;
+
   const filters = getDashboardFilters();
   const params = new URLSearchParams();
 
@@ -75,6 +83,11 @@ async function downloadFilteredExport(format) {
   const query = params.toString() ? `?${params.toString()}` : "";
 
   try {
+    await consumeCredits(access, `export_${format}`, {
+      survey_id: selectedSurveyId,
+      source: "dashboard",
+    });
+
     const response = await fetch(
       `${API_BASE}/${selectedSurveyId}/export/${format}/${query}`,
       {
@@ -302,7 +315,7 @@ async function downloadFilteredExport(format) {
     className="rounded px-3 py-2 text-sm font-semibold bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
     style={{ color: "#FFFFFF" }}
   >
-    Télécharger Excel
+    Télécharger Excel · 5 crédits
   </button>
 
   <button
@@ -312,7 +325,7 @@ async function downloadFilteredExport(format) {
     className="rounded px-3 py-2 text-sm font-semibold bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
     style={{ color: "#FFFFFF" }}
   >
-    Télécharger PDF
+    Télécharger PDF · 5 crédits
   </button>
 </div>
   </div>

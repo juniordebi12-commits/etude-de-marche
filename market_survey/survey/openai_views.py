@@ -27,6 +27,10 @@ MOCK_OPENAI = getattr(settings, "MOCK_OPENAI", False)
 MODEL_NAME = "gpt-4o-mini"
 TOKENS_PER_CREDIT = 1000
 SERVER_MAX_TOKENS = 2000
+AI_ACTION_CREDITS = {
+    "questionnaire": 5,
+    "analysis": 8,
+}
 
 
 class InsufficientCreditsError(Exception):
@@ -163,14 +167,14 @@ def call_openai_and_charge(
     if not api_key:
         raise RuntimeError("La clé OPENAI_API_KEY n’est pas configurée.")
 
-    estimated_credits = tokens_to_credits(
-        estimate_messages_tokens(messages, max_tokens)
-    )
+    credits_needed = AI_ACTION_CREDITS.get(action)
+    if credits_needed is None:
+        raise ValueError("Action IA non prise en charge.")
 
-    if account.get_balance() < estimated_credits:
+    if account.get_balance() < credits_needed:
         raise InsufficientCreditsError(
             "Crédits insuffisants : "
-            f"{estimated_credits} requis au maximum, "
+            f"{credits_needed} requis, "
             f"{account.get_balance()} disponibles."
         )
 
@@ -185,7 +189,6 @@ def call_openai_and_charge(
     )
 
     total_tokens = int(getattr(response.usage, "total_tokens", 0) or 0)
-    credits_needed = tokens_to_credits(total_tokens)
 
     if account.get_balance() < credits_needed:
         raise InsufficientCreditsError(
@@ -200,10 +203,7 @@ def call_openai_and_charge(
     with transaction.atomic():
         account.withdraw(
             credits_needed,
-            reason=(
-                f"{action_labels.get(action, 'Utilisation IA')} "
-                f"({MODEL_NAME}) — {total_tokens} tokens"
-            ),
+            reason=action_labels.get(action, "Utilisation IA"),
         )
 
         if PurchaseRecord is not None:
@@ -330,7 +330,6 @@ def chat_proxy(request):
                     "ok": True,
                     "template": response,
                     "credits_used": credits_used,
-                    "tokens": tokens,
                 }
             )
 
@@ -348,7 +347,6 @@ def chat_proxy(request):
                 "ok": True,
                 "template": template,
                 "credits_used": credits_used,
-                "tokens": tokens,
             }
         )
 
@@ -475,7 +473,6 @@ Règles :
                 "summary": summary,
                 "analysis": analysis,
                 "credits_used": credits_used,
-                "tokens": tokens,
             }
         )
 
@@ -527,7 +524,6 @@ def analysis_history(request):
                     "summary": item.summary,
                     "analysis": item.analysis,
                     "credits_used": item.credits_used,
-                    "tokens": item.tokens,
                     "created_at": item.created_at.isoformat(),
                 }
                 for item in analyses
