@@ -8,7 +8,7 @@ import { apiGet, apiPost, apiPut, apiDelete, API_BASE } from "./useApi";
  * - token (access) est optionnel : si null, useApi prendra le token du localStorage
  */
 
-const SURVEY_CACHE_PREFIX = "sana_survey_"; // ✅ pour le cache offline
+const SURVEY_CACHE_PREFIX = "sana_survey_";
 
 /* -------------------------
    Surveys / Responses CRUD
@@ -36,7 +36,6 @@ export async function getSurvey(token, id) {
   const cacheKey = `${SURVEY_CACHE_PREFIX}${id}`;
   const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
 
-  // 1) Si on est en ligne, on tente l’API, puis on met en cache
   if (isOnline) {
     try {
       const data = await apiGet(`/api/surveys/${id}/`, token);
@@ -50,22 +49,24 @@ export async function getSurvey(token, id) {
       return data;
     } catch (err) {
       console.error("getSurvey live failed, fallback to cache", err);
-      // fallback sur le cache si l’API échoue
+
       try {
         const cached = localStorage.getItem(cacheKey);
+
         if (cached) {
           return JSON.parse(cached);
         }
       } catch (e) {
         console.error("Error reading survey cache", e);
       }
+
       return null;
     }
   }
 
-  // 2) Si on est offline, on lit directement le cache
   try {
     const cached = localStorage.getItem(cacheKey);
+
     if (cached) {
       return JSON.parse(cached);
     }
@@ -77,7 +78,7 @@ export async function getSurvey(token, id) {
 }
 
 /* -------------------------
-   Create / Update / Delete helpers (JSON simple)
+   Create / Update / Delete helpers
    ------------------------- */
 
 export async function createSurvey(token, body) {
@@ -93,25 +94,30 @@ export async function deleteSurvey(token, id) {
 }
 
 /* -------------------------
-   Create / Update avec image (multipart/form-data)
+   Create / Update avec image
    ------------------------- */
 
 async function handleFormError(res) {
-  let payload;
+  const text = await res.text();
+
+  let payload = text;
+
   try {
-    payload = await res.json();
+    payload = text ? JSON.parse(text) : null;
   } catch {
-    payload = await res.text();
+    payload = text || "Le serveur n’a retourné aucun détail.";
   }
+
   const err = new Error(`HTTP ${res.status}`);
   err.status = res.status;
   err.payload = payload;
+
   throw err;
 }
 
-// 🆕 création avec image
 export async function createSurveyWithImage(token, payload, imageFile) {
   const form = new FormData();
+
   form.append("title", payload.title ?? "");
   form.append("description", payload.description ?? "");
   form.append("questions", JSON.stringify(payload.questions || []));
@@ -121,34 +127,40 @@ export async function createSurveyWithImage(token, payload, imageFile) {
   }
 
   const headers = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   const res = await fetch(`${API_BASE}/api/surveys/`, {
     method: "POST",
     headers,
-    body: form, // ⚠️ surtout PAS de Content-Type manuel
+    body: form,
   });
 
   if (!res.ok) {
     await handleFormError(res);
   }
+
   return await res.json();
 }
 
-// 🆕 update avec image
 export async function updateSurveyWithImage(token, id, payload, imageFile) {
   const form = new FormData();
+
   form.append("title", payload.title ?? "");
   form.append("description", payload.description ?? "");
   form.append("questions", JSON.stringify(payload.questions || []));
 
-  // image facultative : si tu ne choisis pas de nouvelle image, on ne renvoie pas le champ
   if (imageFile) {
     form.append("image", imageFile);
   }
 
   const headers = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   const res = await fetch(`${API_BASE}/api/surveys/${id}/`, {
     method: "PUT",
@@ -159,10 +171,14 @@ export async function updateSurveyWithImage(token, id, payload, imageFile) {
   if (!res.ok) {
     await handleFormError(res);
   }
+
   return await res.json();
 }
 
-/* Responses CRUD */
+/* -------------------------
+   Responses CRUD
+   ------------------------- */
+
 export async function getResponse(token, id) {
   return await apiGet(`/api/responses/${id}/`, token);
 }
@@ -183,13 +199,16 @@ export async function deleteResponse(token, id) {
   return await apiDelete(`/api/responses/${id}/`, token);
 }
 
-/* Respondent CRUD (useful to delete respondent and its responses) */
+/* -------------------------
+   Respondent CRUD
+   ------------------------- */
+
 export async function listRespondents(token, params = "") {
-  // params may be like "?survey=6" or empty
   const path =
     params && String(params).trim()
       ? `/api/respondents/${params}`
-      : `/api/respondents/`;
+      : "/api/respondents/";
+
   return await apiGet(path, token);
 }
 
@@ -197,11 +216,6 @@ export async function getRespondent(token, id) {
   return await apiGet(`/api/respondents/${id}/`, token);
 }
 
-/**
- * Create respondent:
- * body: { survey: <id>, interviewer_name: "...", participant_name: "..." }
- * Note: Respondent.survey is required by the model — provide survey id here.
- */
 export async function createRespondent(token, body) {
   return await apiPost("/api/respondents/", body, token);
 }
@@ -215,30 +229,33 @@ export async function deleteRespondent(token, id) {
 }
 
 /**
- * Fallback helper: delete responses for a respondent if direct respondent delete fails.
+ * Fallback : supprime les réponses d'un répondant.
  */
 export async function deleteResponsesByRespondent(token, respondentId) {
   const list = await apiGet(
     `/api/responses/?respondent=${respondentId}`,
     token
   );
+
   const items = Array.isArray(list) ? list : list.results || [];
-  for (const r of items) {
+
+  for (const response of items) {
     try {
-      await deleteResponse(token, r.id);
+      await deleteResponse(token, response.id);
     } catch (e) {
       console.warn(
         "deleteResponsesByRespondent: failed to delete response",
-        r.id,
+        response.id,
         e
       );
     }
   }
+
   return true;
 }
 
 /* -------------------------
-   Dashboard helpers (analysis)
+   Dashboard helpers
    ------------------------- */
 
 export async function fetchSurveyAnalysis(token, surveyId) {
@@ -252,140 +269,189 @@ export async function fetchSurveyAnalysis(token, surveyId) {
     : responses.results || [];
 
   const qmap = {};
-  (survey?.questions || []).forEach((q) => {
-    qmap[q.id] = {
-      id: q.id,
-      text: q.text,
-      question_type: q.question_type,
+
+  (survey?.questions || []).forEach((question) => {
+    qmap[question.id] = {
+      id: question.id,
+      text: question.text,
+      question_type: question.question_type,
       totalAnswers: 0,
       choiceCounts: {},
       textAnswers: [],
     };
-    (q.choices || []).forEach((c) => {
-      const key = c.id ?? c.text;
-      qmap[q.id].choiceCounts[key] = {
-        id: c.id ?? null,
-        text: c.text,
+
+    (question.choices || []).forEach((choice) => {
+      const key = choice.id ?? choice.text;
+
+      qmap[question.id].choiceCounts[key] = {
+        id: choice.id ?? null,
+        text: choice.text,
         count: 0,
       };
     });
   });
 
-  parsedResponses.forEach((r) => {
-    let qid = null;
-    if (r.question === undefined || r.question === null) return;
-    if (typeof r.question === "number") qid = r.question;
-    else if (typeof r.question === "object")
-      qid = r.question.id ?? r.question.pk ?? null;
-    if (!qid) return;
+  parsedResponses.forEach((response) => {
+    let questionId = null;
 
-    if (!qmap[qid]) {
-      qmap[qid] = {
-        id: qid,
-        text: r.question?.text ?? `Question ${qid}`,
-        question_type: r.question?.question_type ?? "text",
+    if (response.question === undefined || response.question === null) {
+      return;
+    }
+
+    if (typeof response.question === "number") {
+      questionId = response.question;
+    } else if (typeof response.question === "object") {
+      questionId = response.question.id ?? response.question.pk ?? null;
+    }
+
+    if (!questionId) {
+      return;
+    }
+
+    if (!qmap[questionId]) {
+      qmap[questionId] = {
+        id: questionId,
+        text: response.question?.text ?? `Question ${questionId}`,
+        question_type: response.question?.question_type ?? "text",
         totalAnswers: 0,
         choiceCounts: {},
         textAnswers: [],
       };
     }
 
-    const slot = qmap[qid];
-    slot.totalAnswers = (slot.totalAnswers || 0) + 1;
+    const slot = qmap[questionId];
+    slot.totalAnswers += 1;
 
-    if (slot.question_type === "single" || slot.question_type === "multiple") {
-      const sel = r.selected_choices || [];
-      if (Array.isArray(sel)) {
-        sel.forEach((c) => {
-          let cid = null,
-            ctext = null;
-          if (typeof c === "number") cid = c;
-          else if (c && typeof c === "object") {
-            cid = c.id ?? null;
-            ctext = c.text ?? null;
+    if (
+      slot.question_type === "single" ||
+      slot.question_type === "multiple"
+    ) {
+      const selectedChoices = response.selected_choices || [];
+
+      if (Array.isArray(selectedChoices)) {
+        selectedChoices.forEach((choice) => {
+          let choiceId = null;
+          let choiceText = null;
+
+          if (typeof choice === "number") {
+            choiceId = choice;
+          } else if (choice && typeof choice === "object") {
+            choiceId = choice.id ?? null;
+            choiceText = choice.text ?? null;
           }
-          const key = cid ?? ctext ?? JSON.stringify(c);
+
+          const key = choiceId ?? choiceText ?? JSON.stringify(choice);
+
           if (!slot.choiceCounts[key]) {
             slot.choiceCounts[key] = {
-              id: cid,
-              text: ctext ?? String(key),
+              id: choiceId,
+              text: choiceText ?? String(key),
               count: 0,
             };
           }
-          slot.choiceCounts[key].count =
-            (slot.choiceCounts[key].count || 0) + 1;
+
+          slot.choiceCounts[key].count += 1;
         });
-      } else {
-        const c = sel;
-        if (c) {
-          let cid = typeof c === "number" ? c : c?.id ?? null;
-          let key = cid ?? (c?.text ?? String(c));
-          if (!slot.choiceCounts[key])
-            slot.choiceCounts[key] = {
-              id: cid,
-              text: c?.text ?? key,
-              count: 0,
-            };
-          slot.choiceCounts[key].count =
-            (slot.choiceCounts[key].count || 0) + 1;
-        }
       }
-    } else {
-      if (r.answer_text) slot.textAnswers.push(String(r.answer_text));
+    } else if (response.answer_text) {
+      slot.textAnswers.push(String(response.answer_text));
     }
   });
 
-  const questions = Object.values(qmap).map((q) => {
-    const choiceCounts = Object.values(q.choiceCounts || {}).map((c) => ({
-      id: c.id,
-      text: c.text,
-      count: c.count || 0,
-    }));
+  const questions = Object.values(qmap).map((question) => {
+    const choiceCounts = Object.values(question.choiceCounts || {}).map(
+      (choice) => ({
+        id: choice.id,
+        text: choice.text,
+        count: choice.count || 0,
+      })
+    );
+
     choiceCounts.sort((a, b) => b.count - a.count);
+
     return {
-      id: q.id,
-      text: q.text,
-      question_type: q.question_type,
-      totalAnswers: q.totalAnswers || 0,
+      id: question.id,
+      text: question.text,
+      question_type: question.question_type,
+      totalAnswers: question.totalAnswers || 0,
       choiceCounts,
-      textAnswers: q.textAnswers || [],
+      textAnswers: question.textAnswers || [],
     };
   });
 
-  const totalResponses = parsedResponses.length;
-
   return {
     survey,
-    totalResponses,
+    totalResponses: parsedResponses.length,
     questions,
     raw: { responses: parsedResponses },
   };
 }
 
 /**
- * fetchDashboardSummary: fallback local computation if needed
+ * Dashboard principal.
+ * Utilise l'API améliorée ; garde un mode dégradé si elle est indisponible.
  */
-export async function fetchDashboardSummary(token) {
+export async function fetchDashboardSummary(token, filters = {}) {
   try {
-    const summary = await apiGet("/api/dashboard-summary/", token);
+    const params = new URLSearchParams();
+
+if (filters.from) params.set("from", filters.from);
+if (filters.to) params.set("to", filters.to);
+
+if (filters.surveyId) {
+  params.set("survey_id", filters.surveyId);
+}
+
+if (filters.interviewer) {
+  params.set("interviewer", filters.interviewer);
+}
+
+const query = params.toString() ? `?${params.toString()}` : "";
+const summary = await apiGet(
+  `/api/dashboard-summary/${query}`,
+  token
+);
+
     if (
       summary &&
-      (summary.total_surveys || summary.total_responses || summary.top_surveys)
+      (
+        summary.total_surveys !== undefined ||
+        summary.total_responses !== undefined ||
+        summary.top_surveys
+      )
     ) {
       return {
-        totalSurveys: summary?.total_surveys ?? 0,
-        totalResponses: summary?.total_responses ?? 0,
-        surveys: (summary?.top_surveys || []).map((s) => ({
-          id: s.id,
-          title: s.title,
-          description: s.description,
-          responses: s.responses ?? 0,
+        totalSurveys: summary.total_surveys ?? 0,
+        totalResponses: summary.total_responses ?? 0,
+        totalRespondents: summary.total_respondents ?? 0,
+        activeSurveys: summary.active_surveys ?? 0,
+        completionRate: summary.completion_rate ?? 0,
+        interviewerStats: summary.interviewer_stats ?? [],
+        dailyActivity: summary.daily_activity ?? [],
+        surveysWithoutResponses: summary.surveys_without_responses ?? [],
+        availableSurveys: summary.available_surveys ?? [],
+        availableInterviewers: summary.available_interviewers ?? [],
+
+        surveys: (summary.top_surveys || []).map((survey) => ({
+          id: survey.id,
+          title: survey.title,
+          description: survey.description ?? "",
+          responses: survey.responses ?? 0,
+          respondents: survey.respondents ?? 0,
+          questions: survey.questions ?? 0,
+          completion_rate: survey.completion_rate ?? 0,
+          created_at: survey.created_at ?? "",
+          updated_at: survey.updated_at ?? "",
         })),
+
         raw: summary,
       };
     }
   } catch (e) {
-    // fallback local computation below
+    console.warn(
+      "Dashboard API indisponible, calcul local utilisé.",
+      e
+    );
   }
 
   const [surveys, responses] = await Promise.all([
@@ -393,49 +459,78 @@ export async function fetchDashboardSummary(token) {
     listResponses(token).catch(() => []),
   ]);
 
-  const totalSurveys = Array.isArray(surveys) ? surveys.length : 0;
-  const totalResponses = Array.isArray(responses) ? responses.length : 0;
+  const surveyList = Array.isArray(surveys)
+    ? surveys
+    : surveys.results || [];
+
+  const responseList = Array.isArray(responses)
+    ? responses
+    : responses.results || [];
 
   const counts = {};
-  if (Array.isArray(responses)) {
-    responses.forEach((r) => {
-      let sid = null;
-      if (typeof r.survey_id === "number") {
-        sid = r.survey_id;
-      }
-      if (!sid) {
-        const q = r.question || null;
-        if (!q) return;
-        if (typeof q === "object") {
-          if (q.survey) {
-            if (typeof q.survey === "number") sid = q.survey;
-            else if (q.survey && q.survey.id) sid = q.survey.id;
-          }
-          if (!sid && (q.survey_id || q.surveyId))
-            sid = q.survey_id || q.surveyId;
+
+  responseList.forEach((response) => {
+    let surveyId = null;
+
+    if (typeof response.survey_id === "number") {
+      surveyId = response.survey_id;
+    }
+
+    if (!surveyId) {
+      const question = response.question || null;
+
+      if (question && typeof question === "object") {
+        if (typeof question.survey === "number") {
+          surveyId = question.survey;
+        } else if (question.survey?.id) {
+          surveyId = question.survey.id;
+        } else {
+          surveyId = question.survey_id || question.surveyId || null;
         }
       }
-      if (!sid) return;
-      counts[sid] = (counts[sid] || 0) + 1;
-    });
-  }
+    }
 
-  const surveysWithCounts = (Array.isArray(surveys) ? surveys : []).map(
-    (s) => ({
-      id: s.id,
-      title: s.title,
-      description: s.description,
-      responses: counts[s.id] || 0,
-    })
-  );
+    if (surveyId) {
+      counts[surveyId] = (counts[surveyId] || 0) + 1;
+    }
+  });
 
-  surveysWithCounts.sort((a, b) => b.responses - a.responses);
+  const surveysWithCounts = surveyList
+    .map((survey) => ({
+      id: survey.id,
+      title: survey.title,
+      description: survey.description ?? "",
+      responses: counts[survey.id] || 0,
+      respondents: 0,
+      questions: Array.isArray(survey.questions)
+        ? survey.questions.length
+        : 0,
+      completion_rate: 0,
+    }))
+    .sort((a, b) => b.responses - a.responses);
 
   return {
-    totalSurveys,
-    totalResponses,
+    totalSurveys: surveyList.length,
+    totalResponses: responseList.length,
+    availableSurveys: surveyList.map((survey) => ({
+  id: survey.id,
+  title: survey.title,
+})),
+    totalRespondents: 0,
+    activeSurveys: surveysWithCounts.filter(
+      (survey) => survey.responses > 0
+    ).length,
+    completionRate: 0,
+    interviewerStats: [],
+    dailyActivity: [],
+    surveysWithoutResponses: surveysWithCounts
+      .filter((survey) => survey.responses === 0)
+      .slice(0, 5),
     surveys: surveysWithCounts,
-    raw: { surveys, responses },
+    raw: {
+      surveys: surveyList,
+      responses: responseList,
+    },
   };
 }
 

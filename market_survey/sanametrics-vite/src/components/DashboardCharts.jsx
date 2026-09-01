@@ -1,298 +1,495 @@
-// src/components/DashboardCharts.jsx
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
   CartesianGrid,
+  Cell,
 } from "recharts";
 import { getResponsesBySurvey } from "../api/useDashboard";
 import { useAuth } from "../api/useAuth";
 import html2canvas from "html2canvas";
 
-/* Helper CSV (simple, safe) */
-function downloadCsvFile(filename, rows = [], header = []) {
-  if (!rows || rows.length === 0) {
+function downloadCsvFile(filename, rows = []) {
+  if (!rows.length) {
     alert("Aucune donnée à exporter.");
     return;
   }
-  const cols = header.length ? header : Object.keys(rows[0]);
+
+  const columns = Object.keys(rows[0]);
+
   const csv = [
-    cols.join(","),
-    ...rows.map(r =>
-      cols
-        .map(c => {
-          const v = r[c] == null ? "" : String(r[c]).replace(/"/g, '""');
-          return `"${v}"`;
+    columns.join(","),
+    ...rows.map((row) =>
+      columns
+        .map((column) => {
+          const value =
+            row[column] === null || row[column] === undefined
+              ? ""
+              : typeof row[column] === "object"
+                ? JSON.stringify(row[column])
+                : String(row[column]);
+
+          return `"${value.replace(/"/g, '""')}"`;
         })
         .join(",")
     ),
   ].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+  const blob = new Blob(["\uFEFF", csv], {
+    type: "text/csv;charset=utf-8;",
+  });
+
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = filename;
+
   document.body.appendChild(link);
   link.click();
   link.remove();
+
+  URL.revokeObjectURL(link.href);
 }
 
-export default function DashboardCharts({ topSurveys = [] }) {
+function formatDate(date) {
+  if (!date) return "";
+
+  const parts = String(date).split("-");
+
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}`;
+  }
+
+  return date;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("fr-FR").format(value ?? 0);
+}
+
+export default function DashboardCharts({
+  topSurveys = [],
+  dailyActivity = [],
+}) {
   const { access } = useAuth();
+
   const [detailed, setDetailed] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [chartType, setChartType] = useState("bar"); // "bar" | "pie" | "donut"
 
-  const chartRef = useRef(null);
+  const chartsRef = useRef(null);
 
-  const brand = (typeof window !== "undefined"
-    ? getComputedStyle(document.documentElement).getPropertyValue("--brand")
-    : "")?.trim() || "#2563EB";
-  const colors = [brand || "#2563EB", "#60A5FA", "#93C5FD", "#BFDBFE", "#DBEAFE"];
+  const brand =
+    (
+      typeof window !== "undefined"
+        ? getComputedStyle(document.documentElement).getPropertyValue("--brand")
+        : ""
+    )?.trim() || "#2563EB";
 
-  const barData = topSurveys.map(s => ({ name: s.title || `#${s.id}`, responses: s.responses || 0, id: s.id }));
-  const total = barData.reduce((acc, x) => acc + (x.responses || 0), 0) || 1;
-  const pieData = barData.map(d => ({ name: d.name, value: d.responses, id: d.id }));
+  const colors = [
+    brand,
+    "#0EA5E9",
+    "#8B5CF6",
+    "#10B981",
+    "#F59E0B",
+    "#EC4899",
+    "#64748B",
+  ];
 
-  async function onBarClick(surveyId) {
+  const surveyData = [...topSurveys]
+    .map((survey) => ({
+      id: survey.id,
+      name: survey.title || `Enquête ${survey.id}`,
+      responses: survey.responses ?? 0,
+      respondents: survey.respondents ?? 0,
+      completionRate: survey.completion_rate ?? 0,
+    }))
+    .sort((a, b) => b.responses - a.responses);
+
+  const activityData = [...dailyActivity]
+    .map((item) => ({
+      date: item.date,
+      label: formatDate(item.date),
+      respondents: item.respondents ?? 0,
+    }))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  async function loadSurveyResponses(surveyId) {
     if (!surveyId) return;
+
     setLoading(true);
+    setDetailed(null);
+
     try {
-      const resp = await getResponsesBySurvey(access, surveyId);
-      setDetailed({ surveyId, responses: Array.isArray(resp) ? resp : (resp.results || resp) });
-    } catch (e) {
-      console.error("Erreur chargement réponses:", e);
-      setDetailed({ surveyId, error: e });
+      const data = await getResponsesBySurvey(access, surveyId);
+
+      setDetailed({
+        surveyId,
+        responses: Array.isArray(data) ? data : data.results || [],
+      });
+    } catch (error) {
+      console.error("Erreur lors du chargement des réponses :", error);
+
+      setDetailed({
+        surveyId,
+        error,
+      });
     } finally {
       setLoading(false);
     }
   }
 
-  async function onPieClick(entry) {
-    const id = entry?.payload?.id;
-    if (id) await onBarClick(id);
-  }
-
-  async function downloadNodeAsPng(node, filename = "chart.png") {
-    if (!node) {
-      alert("Rien à capturer.");
+  async function downloadChartsAsPng() {
+    if (!chartsRef.current) {
+      alert("Aucun graphique à télécharger.");
       return;
     }
+
     try {
-      const canvas = await html2canvas(node, { scale: 2, backgroundColor: null });
-      const dataUrl = canvas.toDataURL("image/png");
+      const canvas = await html2canvas(chartsRef.current, {
+        scale: 2,
+        backgroundColor: "#FFFFFF",
+      });
+
       const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = filename;
+      link.href = canvas.toDataURL("image/png");
+      link.download = `sanametrics_dashboard_${Date.now()}.png`;
+
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (e) {
-      console.error("Erreur capture chart:", e);
-      alert("Échec de la capture (voir console).");
+    } catch (error) {
+      console.error("Erreur pendant la génération de l'image :", error);
+      alert("Impossible de télécharger les graphiques.");
     }
   }
 
-  /* Convert responses array to rows for CSV:
-     We try to flatten objects simply: keep primitive fields and JSON.stringify complex fields.
-  */
-  function normalizeResponsesForCsv(items = []) {
-    if (!Array.isArray(items) || items.length === 0) return [];
-    // compute union of top-level keys across first N items
-    const keys = new Set();
-    items.slice(0, 50).forEach(it => {
-      Object.keys(it || {}).forEach(k => keys.add(k));
-    });
-    const cols = Array.from(keys);
-    return items.map(it => {
-      const row = {};
-      cols.forEach(k => {
-        const v = it[k];
-        if (v == null) row[k] = "";
-        else if (typeof v === "object") row[k] = JSON.stringify(v);
-        else row[k] = String(v);
-      });
-      return row;
-    });
-  }
+  const responseRows = Array.isArray(detailed?.responses)
+    ? detailed.responses.map((response) => ({
+        id: response.id ?? "",
+        respondent:
+          response.respondent?.participant_name ??
+          response.respondent_name ??
+          "",
+        question:
+          response.question?.text ??
+          response.question_text ??
+          response.question ??
+          "",
+        reponse:
+          response.answer_text ??
+          (
+            Array.isArray(response.selected_choices)
+              ? response.selected_choices
+                  .map((choice) => choice.text ?? choice)
+                  .join(" ; ")
+              : ""
+          ),
+        date: response.created_at ?? "",
+      }))
+    : [];
 
   return (
-    <div className="grid grid-cols-1 gap-6">
-      <div className="section-card p-4" ref={chartRef}>
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold">Top enquêtes — réponses</h4>
+    <div className="space-y-8" ref={chartsRef}>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h3 className="font-semibold text-lg">
+            Visualisation de la collecte
+          </h3>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setChartType("bar")}
-                className={`px-3 py-1 rounded ${chartType === "bar" ? "bg-[var(--brand)] text-white" : "bg-transparent text-[var(--text-default)] border border-[var(--input-border)]"}`}
-              >
-                Bar
-              </button>
-              <button
-                onClick={() => setChartType("pie")}
-                className={`px-3 py-1 rounded ${chartType === "pie" ? "bg-[var(--brand)] text-white" : "bg-transparent text-[var(--text-default)] border border-[var(--input-border)]"}`}
-              >
-                Pie
-              </button>
-              <button
-                onClick={() => setChartType("donut")}
-                className={`px-3 py-1 rounded ${chartType === "donut" ? "bg-[var(--brand)] text-white" : "bg-transparent text-[var(--text-default)] border border-[var(--input-border)]"}`}
-              >
-                Donut
-              </button>
-            </div>
-
-            <button
-              onClick={() => downloadNodeAsPng(chartRef.current, `top_surveys_${Date.now()}.png`)}
-              className="px-3 py-1 border rounded text-sm btn-outline"
-              title="Télécharger ce graphique (PNG)"
-            >
-              Télécharger
-            </button>
-          </div>
+          <p className="text-xs text-muted mt-1">
+            Évolution des répondants et comparaison des enquêtes.
+          </p>
         </div>
 
-        {barData.length === 0 ? (
-          <div className="text-sm text-muted">Aucune donnée disponible</div>
-        ) : (
+        <button
+          type="button"
+          onClick={downloadChartsAsPng}
+          className="btn-outline text-sm"
+        >
+          Télécharger les graphiques
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="rounded-xl border border-[var(--input-border)] p-4 bg-white">
+          <div className="mb-4">
+            <h4 className="font-semibold">
+              Évolution de la collecte
+            </h4>
+
+            <p className="text-xs text-muted mt-1">
+              Répondants enregistrés chaque jour.
+            </p>
+          </div>
+
+          {activityData.length === 0 ? (
+            <div className="h-72 flex items-center justify-center rounded-lg border border-dashed text-center text-sm text-muted px-6">
+              Aucune collecte au cours des 30 derniers jours. Les indicateurs
+              globaux restent disponibles en haut du dashboard.
+            </div>
+          ) : (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={activityData}
+                  margin={{
+                    top: 12,
+                    right: 20,
+                    left: -15,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="rgba(100, 116, 139, 0.18)"
+                  />
+
+                  <XAxis
+                    dataKey="label"
+                    tick={{
+                      fontSize: 11,
+                      fill: "#64748B",
+                    }}
+                  />
+
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{
+                      fontSize: 11,
+                      fill: "#64748B",
+                    }}
+                  />
+
+                  <Tooltip
+                    formatter={(value) => [
+                      `${formatNumber(value)} répondant(s)`,
+                      "Collecte",
+                    ]}
+                    labelFormatter={(label) => `Date : ${label}`}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="respondents"
+                    stroke={brand}
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      fill: brand,
+                    }}
+                    activeDot={{
+                      r: 6,
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[var(--input-border)] p-4 bg-white">
+          <div className="mb-4">
+            <h4 className="font-semibold">
+              Enquêtes les plus actives
+            </h4>
+
+            <p className="text-xs text-muted mt-1">
+              Nombre de réponses enregistrées par enquête.
+            </p>
+          </div>
+
+          {surveyData.length === 0 ? (
+            <div className="h-72 flex items-center justify-center rounded-lg border border-dashed text-center text-sm text-muted px-6">
+              Crée une enquête et commence la collecte pour afficher ce
+              graphique.
+            </div>
+          ) : (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={surveyData}
+                  layout="vertical"
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 25,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    horizontal={false}
+                    stroke="rgba(100, 116, 139, 0.18)"
+                  />
+
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{
+                      fontSize: 11,
+                      fill: "#64748B",
+                    }}
+                  />
+
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={115}
+                    tick={{
+                      fontSize: 11,
+                      fill: "#334155",
+                    }}
+                    tickFormatter={(name) =>
+                      name.length > 18 ? `${name.slice(0, 18)}…` : name
+                    }
+                  />
+
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === "responses") {
+                        return [
+                          `${formatNumber(value)} réponse(s)`,
+                          "Réponses",
+                        ];
+                      }
+
+                      return [value, name];
+                    }}
+                    labelFormatter={(label) => label}
+                  />
+
+                  <Bar
+                    dataKey="responses"
+                    radius={[0, 6, 6, 0]}
+                    cursor="pointer"
+                    onClick={(data) => {
+                      const surveyId = data?.id ?? data?.payload?.id;
+                      loadSurveyResponses(surveyId);
+                    }}
+                  >
+                    {surveyData.map((survey, index) => (
+                      <Cell
+                        key={survey.id}
+                        fill={colors[index % colors.length]}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-[var(--input-border)] p-4 bg-white">
+        <div className="mb-4">
+          <h4 className="font-semibold">
+            Détail d'une enquête
+          </h4>
+
+          <p className="text-xs text-muted mt-1">
+            Clique sur une barre du graphique pour consulter les réponses et
+            les exporter.
+          </p>
+        </div>
+
+        {loading && (
+          <div className="text-sm text-muted">
+            Chargement des réponses…
+          </div>
+        )}
+
+        {!loading && !detailed && (
+          <div className="rounded-lg bg-slate-50 p-5 text-sm text-muted">
+            Sélectionne une enquête depuis le graphique à droite.
+          </div>
+        )}
+
+        {!loading && detailed?.error && (
+          <div className="rounded-lg bg-red-50 p-5 text-sm text-red-700">
+            Erreur :{" "}
+            {detailed.error.message || "Impossible de charger les réponses."}
+          </div>
+        )}
+
+        {!loading && detailed && !detailed.error && (
           <>
-            {chartType === "bar" && (
-              <div style={{ width: "100%", height: 340 }}>
-                <ResponsiveContainer>
-                  <BarChart data={barData} margin={{ top: 8, right: 16, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="responses" onClick={(e) => onBarClick(e.id)}>
-                      {barData.map((entry, idx) => (
-                        <Cell key={`cell-${idx}`} fill={colors[idx % colors.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+            <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm">
+                <span className="font-semibold">
+                  {formatNumber(responseRows.length)}
+                </span>{" "}
+                réponse(s) chargée(s)
+              </div>
+
+              {responseRows.length > 0 && (
+                <button
+                  type="button"
+                  className="btn-primary text-sm"
+                  onClick={() =>
+                    downloadCsvFile(
+                      `sanametrics_reponses_enquete_${detailed.surveyId}.csv`,
+                      responseRows
+                    )
+                  }
+                >
+                  Télécharger en CSV
+                </button>
+              )}
+            </div>
+
+            {responseRows.length === 0 ? (
+              <div className="rounded-lg bg-slate-50 p-5 text-sm text-muted">
+                Cette enquête ne possède pas encore de réponse exploitable.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-left">
+                    <tr>
+                      <th className="p-3 font-semibold">Participant</th>
+                      <th className="p-3 font-semibold">Question</th>
+                      <th className="p-3 font-semibold">Réponse</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {responseRows.slice(0, 10).map((row, index) => (
+                      <tr
+                        key={`${row.id}-${index}`}
+                        className="border-t"
+                      >
+                        <td className="p-3 align-top">
+                          {row.respondent || "Anonyme"}
+                        </td>
+
+                        <td className="p-3 align-top">
+                          {row.question}
+                        </td>
+
+                        <td className="p-3 align-top">
+                          {row.reponse || "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
 
-            {(chartType === "pie" || chartType === "donut") && (
-              <div style={{ width: "100%", height: 340 }}>
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={chartType === "pie" ? 110 : 90}
-                      innerRadius={chartType === "donut" ? 44 : 0}
-                      onClick={(e) => onPieClick(e)}
-                      label={(entry) => `${entry.name} (${Math.round((entry.value / total) * 100)}%)`}
-                    >
-                      {pieData.map((entry, idx) => (
-                        <Cell key={`cell-pie-${idx}`} fill={colors[idx % colors.length]} />
-                      ))}
-                    </Pie>
-                    <Legend verticalAlign="bottom" height={36} />
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+            {responseRows.length > 10 && (
+              <p className="text-xs text-muted mt-3">
+                Aperçu limité aux 10 premières réponses. Le fichier CSV
+                contient toutes les réponses.
+              </p>
             )}
           </>
         )}
-
-        <div className="text-xs text-muted mt-4">Cliquez sur une barre (ou un slice) pour charger les réponses.</div>
-
-        {/* DETAIL: preview table + download CSV */}
-        <div className="mt-4 text-sm">
-          {detailed ? (
-            loading ? (
-              <div>Chargement des réponses...</div>
-            ) : detailed.error ? (
-              <div className="text-red-600">Erreur chargement : {String(detailed.error?.message || detailed.error)}</div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-semibold">Détail réponses (extrait)</div>
-                  <div className="text-xs text-muted">
-                    {Array.isArray(detailed.responses) ? detailed.responses.length : 0} éléments
-                  </div>
-                </div>
-
-                {Array.isArray(detailed.responses) && detailed.responses.length > 0 ? (
-                  <>
-                    {/* preview table (first 8 rows) */}
-                    <div className="overflow-auto border rounded">
-                      <table className="w-full text-sm">
-                        <thead className="bg-[var(--card)]/50">
-                          <tr>
-                            {/* build header from first item keys */}
-                            {Object.keys(detailed.responses[0]).slice(0, 10).map((k) => (
-                              <th key={k} className="p-2 text-left text-xs text-muted">{k}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detailed.responses.slice(0, 8).map((row, i) => (
-                            <tr key={i} className={i % 2 === 0 ? "bg-[var(--bg)]" : ""}>
-                              {Object.keys(detailed.responses[0]).slice(0, 10).map((k) => (
-                                <td key={k} className="p-2 align-top break-words text-xs">{typeof row[k] === "object" ? JSON.stringify(row[k]) : String(row[k] ?? "")}</td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => {
-                          const rows = normalizeResponsesForCsv(detailed.responses);
-                          downloadCsvFile(`responses_survey_${detailed.surveyId}_${Date.now()}.csv`, rows);
-                        }}
-                        className="px-3 py-1 btn-primary text-sm"
-                      >
-                        Télécharger (CSV / Excel)
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          // quick copy first 20 items JSON to clipboard for debugging
-                          try {
-                            navigator.clipboard.writeText(JSON.stringify(detailed.responses.slice(0, 20), null, 2));
-                            alert("Extrait JSON copié dans le presse-papiers (premiers 20).");
-                          } catch (e) {
-                            console.warn(e);
-                            alert("Impossible de copier — regarde la console.");
-                          }
-                        }}
-                        className="px-3 py-1 border rounded text-sm btn-outline"
-                      >
-                        Copier extrait (JSON)
-                      </button>
-                    </div>
-
-                    <div className="text-xs text-muted mt-2">Aperçu limité : les colonnes affichées sont les clés du premier objet. Le CSV exporte toutes les clés présentes (dans l'extrait).</div>
-                  </>
-                ) : (
-                  <div className="text-sm text-muted">Aucune réponse structurée trouvée.</div>
-                )}
-              </div>
-            )
-          ) : (
-            <div className="text-sm text-muted">Cliquez sur une barre ou un slice pour voir un extrait des réponses.</div>
-          )}
-        </div>
       </div>
     </div>
   );

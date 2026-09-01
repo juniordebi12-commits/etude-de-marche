@@ -1,66 +1,109 @@
-// src/components/Footer.jsx
 import React from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../api/useAuth";
+import Logo from "../assets/LogoSana.png";
+
+const linkClass = "text-sm text-slate-300 transition hover:text-white";
 
 export default function Footer() {
+  const { isAuthenticated, access } = useAuth();
+  const loggedIn = isAuthenticated || Boolean(access);
+  const currentYear = new Date().getFullYear();
+
+  const ctaTo = loggedIn ? "/editor" : "/register";
+  const ctaLabel = loggedIn ? "Créer une enquête" : "Créer mon compte";
+
   return (
-    <footer className="border-t bg-white dark:bg-slate-900 mt-16">
-      <div className="container py-10">
+    <footer className="border-t border-slate-800 bg-slate-950">
+      <div className="container py-12 md:py-14">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4">
+          <div className="lg:col-span-2">
+            <Link to="/" className="flex w-fit items-center gap-2.5">
+              <img
+                src={Logo}
+                alt="SanaMetrics"
+                className="h-9 w-9 object-contain"
+              />
+              <span className="text-lg font-bold text-white">SanaMetrics</span>
+            </Link>
 
-        {/* Top sections */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-sm">
-
-          {/* Logo + description */}
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              SanaMetrics
-            </h2>
-            <p className="text-slate-500 dark:text-slate-400 mt-2 max-w-xs">
-              La plateforme moderne pour créer, collecter et analyser vos données
-              en un seul endroit.
+            <p className="mt-4 max-w-sm text-sm leading-7 text-slate-300">
+              Créez vos enquêtes, collectez les réponses sur le terrain,
+              analysez les résultats et exportez vos rapports simplement.
             </p>
+
+            <Link
+              to={ctaTo}
+              className="mt-5 inline-flex rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-on-brand transition hover:bg-blue-500"
+            >
+              {ctaLabel}
+            </Link>
           </div>
 
-          {/* Produits */}
           <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">
-              Produits
-            </h3>
-            <ul className="space-y-1 text-slate-600 dark:text-slate-400">
-              <li><Link to="/features" className="hover:text-[var(--brand,#4f46e5)] transition">Fonctionnalités</Link></li>
-              <li><Link to="/templates" className="hover:text-[var(--brand,#4f46e5)] transition">Modèles prêts</Link></li>
-              <li><Link to="/pricing" className="hover:text-[var(--brand,#4f46e5)] transition">Tarifs</Link></li>
+            <h3 className="mb-4 text-sm font-bold text-white">Découvrir</h3>
+
+            <ul className="space-y-3">
+              <li>
+                <Link to="/features" className={linkClass}>
+                  Fonctionnalités
+                </Link>
+              </li>
+              <li>
+                <Link to="/pricing" className={linkClass}>
+                  Tarifs
+                </Link>
+              </li>
+              {loggedIn && (
+                <li>
+                  <Link to="/dashboard" className={linkClass}>
+                    Mon dashboard
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
 
-          {/* Outils Pro */}
           <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">
-              Outils Pro
-            </h3>
-            <ul className="space-y-1 text-slate-600 dark:text-slate-400">
-              <li><Link to="/entreprises" className="hover:text-[var(--brand,#4f46e5)] transition">Entreprise</Link></li>
-              <li><Link to="/integrations" className="hover:text-[var(--brand,#4f46e5)] transition">Intégrations</Link></li>
-              <li><Link to="/team" className="hover:text-[var(--brand,#4f46e5)] transition">Collaboration</Link></li>
+            <h3 className="mb-4 text-sm font-bold text-white">SanaMetrics</h3>
+
+            <ul className="space-y-3">
+              <li>
+                <Link to="/about" className={linkClass}>
+                  À propos
+                </Link>
+              </li>
+              <li>
+                <a href="mailto:contact@sana.app" className={linkClass}>
+                  Nous contacter
+                </a>
+              </li>
+              {!loggedIn && (
+                <>
+                  <li>
+                    <Link to="/login" className={linkClass}>
+                      Se connecter
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/register" className={linkClass}>
+                      Créer un compte
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
-
-          {/* Ressources */}
-          <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-2">
-              Ressources
-            </h3>
-            <ul className="space-y-1 text-slate-600 dark:text-slate-400">
-              <li><Link to="/about" className="hover:text-[var(--brand,#4f46e5)] transition">À propos</Link></li>
-              <li><a href="mailto:contact@sana.app" className="hover:text-[var(--brand,#4f46e5)] transition">Contact</a></li>
-            </ul>
-          </div>
-
         </div>
 
-        {/* Bottom bar */}
-        <div className="border-t mt-10 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-          <div>© 2025 SanaMetrics — Tous droits réservés.</div>
+        <div className="mt-12 flex flex-col gap-3 border-t border-slate-800 pt-6 text-xs text-slate-400 md:flex-row md:items-center md:justify-between">
+          <p>© {currentYear} SanaMetrics. Tous droits réservés.</p>
+
+          <div className="flex gap-4">
+            <span>Créer</span>
+            <span>Collecter</span>
+            <span>Analyser</span>
+          </div>
         </div>
       </div>
     </footer>

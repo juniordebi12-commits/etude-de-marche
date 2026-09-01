@@ -183,7 +183,13 @@ input::placeholder, textarea::placeholder {
 .btn-outline:hover { background: rgba(0,0,0,0.03); }
 
 /* helper for always-white text on brand backgrounds (if needed) */
-.text-on-brand { color: white !important; }
+a.btn-primary,
+a.btn-primary:visited,
+a.text-on-brand,
+a.text-on-brand:visited {
+  color: #ffffff !important;
+  text-decoration: none !important;
+}
 
 /* ============================================================
    Header CTA tweak (small responsive) 

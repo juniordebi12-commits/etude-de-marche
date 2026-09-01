@@ -1,223 +1,285 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 
-// Pricing.jsx inspired by Notion pricing layout but adapted to SanaMetrics
-// Tailwind-based, responsive, includes: hero, tier comparison, credits packs, FAQ, CTA
-
-const TIERS = [
+const CREDIT_PACKS = [
   {
-    id: "free",
-    name: "Free",
-    price: "0 FCFA",
-    subtitle: "Pour tester",
-    bullets: [
-      "2 enquêtes actives",
-      "100 réponses / mois",
-      "Export CSV",
-      "Mode terrain hors-ligne (basique)",
+    id: "decouverte",
+    name: "Découverte",
+    credits: 10,
+    price: "1 000 FCFA",
+    unitPrice: "100 FCFA / crédit",
+    description: "Pour découvrir les fonctions IA de SanaMetrics.",
+    examples: [
+      "Environ 5 questionnaires générés",
+      "Ou environ 3 analyses IA",
+      "Aucun abonnement",
     ],
-    creditsIncluded: 0,
-    cta: { label: "Commencer gratuitement", to: "/editor" },
   },
   {
-    id: "pro",
-    name: "Pro",
-    price: "Coming soon",
-    suffix: "/mois",
-    subtitle: "Pour professionnels & petites équipes",
-    bullets: [
-      "Enquêtes illimitées",
-      "Réponses illimitées*",
-      "Génération IA de questionnaires",
-      "Dashboard & analyses avancées",
+    id: "terrain",
+    name: "Terrain",
+    credits: 40,
+    price: "3 000 FCFA",
+    unitPrice: "75 FCFA / crédit",
+    description: "Pour les équipes qui collectent régulièrement.",
+    examples: [
+      "Environ 20 questionnaires générés",
+      "Ou environ 13 analyses IA",
+      "25 % de crédits en plus",
     ],
-    creditsIncluded: 25000,
-    cta: { label: "Passer en Pro", to: "/surveys" },
+  },
+  {
+    id: "croissance",
+    name: "Croissance",
+    credits: 100,
+    price: "6 000 FCFA",
+    unitPrice: "60 FCFA / crédit",
+    description: "Le meilleur équilibre pour suivre plusieurs enquêtes.",
+    examples: [
+      "Environ 50 questionnaires générés",
+      "Ou environ 33 analyses IA",
+      "Pack le plus avantageux",
+    ],
     recommended: true,
   },
   {
-    id: "enterprise",
-    name: "Entreprise",
-    price: "Sur mesure",
-    subtitle: "Grand volume / support dédié",
-    bullets: [
-      "Multi-comptes & droits avancés",
-      "Intégrations & API sur mesure",
-      "Accompagnement & onboarding",
-      "Contrat et facturation entreprise",
+    id: "organisation",
+    name: "Organisation",
+    credits: 250,
+    price: "12 000 FCFA",
+    unitPrice: "48 FCFA / crédit",
+    description: "Pour les organisations et équipes à fort volume.",
+    examples: [
+      "Environ 125 questionnaires générés",
+      "Ou environ 83 analyses IA",
+      "Meilleur prix par crédit",
     ],
-    creditsIncluded: null,
-    cta: { label: "Demander une démo", href: "mailto:contact@sana.app" },
   },
 ];
 
-const CREDIT_PACKS = [
-  { id: "c1", title: "Découverte", credits: 5000, price: "Coming soon" },
-  { id: "c2", title: "Pro", credits: 25000, price: "Coming soon" },
-  { id: "c3", title: "Volume", credits: 120000, price: "Coming soon" },
-];
+function CreditPack({ pack }) {
+  return (
+    <article
+      className={`relative flex flex-col rounded-2xl border p-6 ${
+        pack.recommended
+          ? "border-blue-500 bg-slate-900 shadow-lg shadow-blue-950/30"
+          : "border-slate-800 bg-slate-900/70"
+      }`}
+    >
+      {pack.recommended && (
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white">
+          Recommandé
+        </span>
+      )}
+
+      <div>
+        <p className="text-sm font-medium text-cyan-400">{pack.name}</p>
+
+        <div className="mt-3 flex items-end gap-2">
+          <span className="text-4xl font-extrabold text-white">
+            {pack.credits}
+          </span>
+          <span className="pb-1 text-sm text-slate-400">crédits</span>
+        </div>
+
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          {pack.description}
+        </p>
+
+        <div className="mt-6 border-y border-slate-800 py-4">
+          <p className="text-2xl font-bold text-white">{pack.price}</p>
+          <p className="mt-1 text-xs text-slate-400">{pack.unitPrice}</p>
+        </div>
+
+        <ul className="mt-5 space-y-3 text-sm text-slate-200">
+          {pack.examples.map((item) => (
+            <li key={item} className="flex gap-2">
+              <span className="font-bold text-cyan-400">✓</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <Link
+        to={`/billing?pack=${pack.id}`}
+        className="mt-7 block rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold transition hover:bg-blue-500"
+        style={{ color: "#FFFFFF" }}
+      >
+        Choisir ce pack
+      </Link>
+    </article>
+  );
+}
 
 export default function Pricing() {
-  const [billingMode] = useState("mois"); // placeholder for monthly/yearly toggle
-
   return (
-    <div className="bg-slate-50 min-h-screen">
-      <div className="container py-12 md:py-20">
-        {/* HERO */}
-        <header className="text-center max-w-3xl mx-auto mb-12">
-          <p className="text-xs uppercase tracking-wider text-indigo-600 font-semibold">Tarifs</p>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mt-4">
-            Tarification simple, crédits IA sur-mesure
-          </h1>
-          <p className="mt-4 text-sm text-slate-600">
-            Commencez gratuitement puis montez en puissance. Les crédits servent à payer la génération IA (prompts
-            + réponses). Vous gardez la maîtrise via des limites côté serveur et packs de crédits achetables.
-          </p>
-        </header>
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <section className="border-b border-slate-800">
+  <div className="container py-14 md:py-16">
+    <div className="mx-auto max-w-3xl text-center">
+      <p
+        className="text-xs font-semibold uppercase tracking-[0.22em]"
+        style={{ color: "#22D3EE" }}
+      >
+        Crédits IA SanaMetrics
+      </p>
 
-        {/* TIER CARDS (Notion-style centered cards) */}
-        <section className="grid gap-6 md:grid-cols-3 mb-10 items-stretch">
-          {TIERS.map((t) => (
-            <div
-              key={t.id}
-              className={`relative rounded-2xl p-6 shadow-sm border bg-white flex flex-col justify-between transition-transform hover:scale-[1.01] ${
-                t.recommended ? "border-[var(--brand,#4f46e5)] shadow-lg" : ""
-              }`}
-            >
-              {t.recommended && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[var(--brand,#4f46e5)] text-white px-3 py-1 rounded-full text-xs font-semibold shadow">Recommandé</div>
-              )}
+      <h1
+        className="mt-4 text-4xl font-extrabold leading-tight md:text-5xl"
+        style={{ color: "#FFFFFF" }}
+      >
+        Payez uniquement ce que vous utilisez.
+      </h1>
 
-              <div>
-                <div className="flex items-baseline gap-3">
-                  <h2 className="text-xl font-semibold text-slate-900">{t.name}</h2>
-                  <div className="text-sm text-slate-500">{t.subtitle}</div>
-                </div>
-
-                <div className="mt-4 flex items-end gap-3">
-                  <div className="text-3xl md:text-4xl font-extrabold text-slate-900">{t.price}</div>
-                  {t.suffix && <div className="text-sm text-slate-500">{t.suffix}</div>}
-                </div>
-
-                <ul className="mt-6 space-y-2 text-sm text-slate-600">
-                  {t.bullets.map((b, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <span className="mt-1 inline-block h-3 w-3 rounded-full bg-[var(--brand,#4f46e5)]" />
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {t.creditsIncluded !== null && (
-                  <div className="mt-4 text-xs text-slate-500">
-                    <strong>{t.creditsIncluded?.toLocaleString() ?? "—"}</strong> crédits IA inclus / mois
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6">
-                {t.cta.to ? (
-                  <Link
-                    to={t.cta.to}
-                    className={`block w-full text-center px-4 py-2 rounded-full font-semibold ${
-                      t.recommended ? "inline-flex items-center justify-center w-full px-4 py-2.5 rounded-full text-sm font-semibold transition bg-[#2563eb] hover:bg-[#1e4fd1] text-white !text-white border border-transparent" : "border border-slate-200 bg-white text-slate-900"
-                    }`}
-                  >
-                    {t.cta.label}
-                  </Link>
-                ) : (
-                  <a href={"/entreprises"} className="block w-full text-center px-4 py-2 rounded-full border border-slate-200 bg-white font-semibold">
-                    {t.cta.label}
-                  </a>
-                )}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* Comparison table (compact) */}
-        <section className="mb-12">
-          <div className="overflow-x-auto bg-white rounded-2xl border p-4">
-            <table className="w-full table-auto text-sm">
-              <thead>
-                <tr className="text-left text-xs text-slate-500 border-b">
-                  <th className="py-3">Fonctionnalité</th>
-                  {TIERS.map((t) => (
-                    <th key={t.id} className="py-3 text-center">{t.name}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ["Enquêtes actives", ["2", "Illimité", "Sur demande"]],
-                  ["Génération IA", ["Non incluse", "Incluse (quota)", "Sur demande"]],
-                  ["Crédits IA inclus", ["0", "25 000", "Sur mesure"]],
-                  ["Support", ["Email", "Prioritaire", "Dédié/SLAs"]],
-                ].map((row, idx) => (
-                  <tr key={idx} className="border-b last:border-0">
-                    <td className="py-4 text-slate-700 font-medium w-1/3">{row[0]}</td>
-                    {row[1].map((val, i) => (
-                      <td key={i} className="py-4 text-center text-slate-600">{val}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Credit packs (visual tiles) */}
-        <section className="mb-12">
-          <h3 className="text-xl font-semibold mb-4">Packs de crédits</h3>
-          <div className="flex gap-4 flex-wrap">
-            {CREDIT_PACKS.map((p) => (
-              <div key={p.id} className="min-w-[220px] bg-white rounded-2xl border p-4 shadow-sm flex flex-col">
-                <div className="text-sm text-slate-500">{p.title}</div>
-                <div className="mt-2 text-2xl font-extrabold text-slate-900">{p.credits.toLocaleString()} crédits</div>
-                <div className="mt-2 text-sm text-slate-600">{p.price}</div>
-                <div className="mt-4">
-                  <Link to="/billing" className="inline-flex px-4 py-2.5 rounded-full text-sm font-semibold transition bg-[#2563eb] hover:bg-[#1e4fd1] text-white !text-white border border-transparent">
-                    Acheter
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* FAQ + CTA */}
-        <section className="grid md:grid-cols-2 gap-6 items-start">
-          <div className="bg-white rounded-2xl border p-6">
-            <h4 className="text-lg font-semibold mb-3">Questions fréquentes</h4>
-            <div className="space-y-3 text-sm text-slate-600">
-              <div>
-                <div className="font-medium">Comment sont calculés les crédits ?</div>
-                <div className="text-xs text-slate-500 mt-1">Les tokens utilisés par l'IA (entrée + sortie) sont convertis en crédits selon une règle configurable côté serveur (ex : 1 crédit = 1 000 tokens).</div>
-              </div>
-              <div>
-                <div className="font-medium">Que se passe-t-il si je dépasse mon quota ?</div>
-                <div className="text-xs text-slate-500 mt-1">Vous pouvez acheter un pack de crédits depuis la page Facturation pour continuer la génération IA.</div>
-              </div>
-              <div>
-                <div className="font-medium">Puis-je annuler mon abonnement ?</div>
-                <div className="text-xs text-slate-500 mt-1">Oui — gestion depuis l'espace facturation. Les packs achetés sont crédités immédiatement sur votre compte.</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 min-h-screen">
-            <div>
-              <h4 className="text-2xl font-extrabold">Prêt à commencer ?</h4>
-              <p className="mt-3 text-sm text-indigo-100">Testez gratuitement ou passez en Pro pour débloquer la génération IA et un quota de crédits mensuel.</p>
-            </div>
-            <div className="mt-6 flex gap-3">
-              <Link to="/register" className="inline-flex items-center px-4 py-2 rounded-full bg-white text-[var(--brand,#2563eb)] font-semibold">Créer un compte</Link>
-              <Link to="/billing" className="inline-flex px-4 py-2.5 rounded-full text-sm font-semibold transition bg-[#2563eb] hover:bg-[#1e4fd1] text-white !text-white border border-transparent">Gérer mes crédits</Link>
-            </div>
-          </div>
-        </section>
-
-      </div>
+      <p
+        className="mx-auto mt-5 max-w-2xl text-base leading-8 md:text-lg"
+        style={{ color: "#CBD5E1" }}
+      >
+        Achetez des crédits une seule fois et utilisez-les quand vous en avez
+        besoin. Aucun abonnement, aucune limite mensuelle.
+      </p>
     </div>
+  </div>
+</section>
+      <section className="container py-14 md:py-20">
+        <div className="mx-auto mb-10 max-w-3xl text-center">
+          <p className="text-sm font-medium text-cyan-400">
+            Des crédits utiles, pas des fonctionnalités bloquées
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold text-white md:text-3xl">
+            Vos enquêtes restent accessibles
+          </h2>
+
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+            Créer, partager, collecter et exporter vos enquêtes reste
+            disponible. Les crédits sont utilisés uniquement pour les fonctions
+            d’intelligence artificielle.
+          </p>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {CREDIT_PACKS.map((pack) => (
+            <CreditPack key={pack.id} pack={pack} />
+          ))}
+        </div>
+      </section>
+
+      <section className="container pb-14 md:pb-20">
+        <div className="grid gap-5 md:grid-cols-2">
+          <article className="rounded-2xl border border-slate-800 bg-slate-900 p-7">
+            <p className="text-sm font-semibold text-cyan-400">
+              Génération de questionnaire
+            </p>
+
+            <h2 className="mt-2 text-xl font-bold text-white">
+              2 crédits par génération
+            </h2>
+
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              Décrivez votre besoin et l’IA propose un questionnaire structuré
+              que vous pouvez relire et modifier avant de l’envoyer vers
+              l’éditeur.
+            </p>
+          </article>
+
+          <article className="rounded-2xl border border-slate-800 bg-slate-900 p-7">
+            <p className="text-sm font-semibold text-cyan-400">
+              Analyse d’enquête
+            </p>
+
+            <h2 className="mt-2 text-xl font-bold text-white">
+              À partir de 3 crédits par analyse
+            </h2>
+
+            <p className="mt-3 text-sm leading-7 text-slate-300">
+              Choisissez une enquête et obtenez une synthèse lisible, les
+              tendances importantes, les points d’attention et des
+              recommandations concrètes.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="border-y border-slate-800 bg-slate-900/60">
+        <div className="container grid gap-8 py-12 md:grid-cols-[1fr_1.2fr] md:py-16">
+          <div>
+            <p className="text-sm font-semibold text-cyan-400">
+              Questions fréquentes
+            </p>
+
+            <h2 className="mt-2 text-2xl font-bold text-white">
+              Simple et transparent
+            </h2>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-semibold text-white">
+                Les crédits expirent-ils chaque mois ?
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-slate-300">
+                Non. Les crédits achetés restent disponibles sur votre compte :
+                il ne s’agit pas d’un abonnement mensuel.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-white">
+                Puis-je utiliser SanaMetrics sans crédits ?
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-slate-300">
+                Oui. Les crédits sont réservés aux fonctions IA. Vous pouvez
+                créer, collecter, consulter et exporter vos enquêtes sans
+                crédit.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-white">
+                Comment connaître mon solde ?
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-slate-300">
+                Votre solde et l’historique des utilisations seront affichés
+                dans votre espace crédits.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="container py-14 md:py-20">
+        <div className="flex flex-col items-start justify-between gap-6 rounded-3xl border border-blue-500/30 bg-slate-900 p-8 md:flex-row md:items-center md:p-10">
+          <div className="max-w-2xl">
+            <h2 className="text-2xl font-bold text-white md:text-3xl">
+              Commencez avec vos premières idées.
+            </h2>
+
+            <p className="mt-3 text-slate-300">
+              Créez une enquête manuellement ou laissez l’IA vous proposer une
+              première version en quelques secondes.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Link
+              to="/ai-chat"
+              className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold transition hover:bg-blue-500"
+              style={{ color: "#FFFFFF" }}
+            >
+              Générer avec l’IA
+            </Link>
+
+            <Link
+              to="/billing"
+              className="rounded-xl border border-slate-600 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-slate-400 hover:bg-slate-800"
+            >
+              Voir mon solde
+            </Link>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

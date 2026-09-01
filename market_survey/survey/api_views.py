@@ -10,6 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count
 from django.db import transaction
 from django.utils import timezone
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 
@@ -60,24 +61,34 @@ class SurveyViewSet(viewsets.ModelViewSet):
 
     def get_serializer(self, *args, **kwargs):
         """
-        Decode 'questions' when request is multipart/form-data and questions arrives as a JSON string.
+        Décode les questions envoyées dans un formulaire multipart
+        lors de l'upload d'une image.
         """
         data = kwargs.get("data")
 
         if data is not None:
-            if hasattr(data, "copy"):
-                data = data.copy()
+            raw_questions = data.get("questions")
 
-            raw_q = data.get("questions")
-            if isinstance(raw_q, str):
+            if isinstance(raw_questions, str):
                 try:
-                    parsed = json.loads(raw_q)
-                    data["questions"] = parsed
-                except Exception:
-                    # if parsing fails, let DRF raise the error later
-                    logger.debug("Could not parse questions JSON string", exc_info=True)
+                    questions = json.loads(raw_questions)
 
-            kwargs["data"] = data
+                    # QueryDict ne gère pas correctement les objets imbriqués.
+                    # On le convertit en dictionnaire standard avant de remettre
+                    # la liste de questions décodée.
+                    normalized_data = {
+                        key: data.get(key)
+                        for key in data.keys()
+                        if key != "questions"
+                    }
+
+                    normalized_data["questions"] = questions
+                    kwargs["data"] = normalized_data
+
+                except json.JSONDecodeError:
+                    logger.warning(
+                        "Impossible de décoder les questions envoyées avec l'image."
+                    )
 
         return super().get_serializer(*args, **kwargs)
 
@@ -93,18 +104,32 @@ class SurveyViewSet(viewsets.ModelViewSet):
 
 class RespondentViewSet(viewsets.ModelViewSet):
     """
-    CRUD for Respondent — useful for frontend deletion.
+    Gestion des répondants.
+    Un utilisateur normal ne voit que les répondants de ses propres enquêtes.
     """
-    queryset = Respondent.objects.all().select_related("survey")
+
     serializer_class = RespondentSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["survey"]
 
+    def get_queryset(self):
+        user = self.request.user
+
+        queryset = Respondent.objects.select_related("survey").all()
+
+        if user.is_authenticated and (user.is_staff or user.is_superuser):
+            return queryset
+
+        if user.is_authenticated:
+            return queryset.filter(survey__owner=user)
+
+        return queryset.none()
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        # safe delete of related answers (DB cascade usually handles it)
         instance.answers.all().delete()
+
         return super().destroy(request, *args, **kwargs)
 
 
@@ -261,34 +286,209 @@ def me_view(request):
 def dashboard_summary(request):
     user = request.user
 
-    total_surveys = Survey.objects.filter(owner=user).count()
+    # Un administrateur peut voir toutes les enquêtes.
+    if user.is_staff or user.is_superuser:
+        surveys = Survey.objects.all()
+    else:
+        surveys = Survey.objects.filter(owner=user)
 
-    total_responses = SurveyResponse.objects.filter(
-        question__survey__owner=user
-    ).count()
-
-    qs = (
-        Survey.objects.filter(owner=user)
-        .annotate(responses=Count("questions__responses"))
-        .order_by("-responses")[:10]
+    available_surveys = list(
+        surveys.order_by("title").values("id", "title")
     )
 
-    top = []
-    for s in qs:
-        top.append(
-            {
-                "id": s.id,
-                "title": s.title,
-                "description": s.description,
-                "responses": s.responses or 0,
-            }
+    survey_id = request.query_params.get("survey_id")
+
+    if survey_id and survey_id != "all":
+        surveys = surveys.filter(id=survey_id)
+
+# Important : cette ligne doit être hors du if.
+# Elle fonctionne donc pour une enquête ou pour toutes les enquêtes.
+    survey_ids = list(surveys.values_list("id", flat=True))
+    # Liste des enquêteurs disponibles pour la ou les enquêtes sélectionnées.
+    available_interviewers = list(
+        Respondent.objects.filter(survey_id__in=survey_ids)
+        .exclude(interviewer_name__isnull=True)
+        .exclude(interviewer_name__exact="")
+        .values_list("interviewer_name", flat=True)
+        .distinct()
+        .order_by("interviewer_name")
+    )
+
+    # Filtres optionnels : période et enquêteur.
+    date_from = request.query_params.get("from")
+    date_to = request.query_params.get("to")
+    interviewer_name = request.query_params.get("interviewer")
+
+    respondents_qs = Respondent.objects.filter(survey_id__in=survey_ids)
+    responses_qs = SurveyResponse.objects.filter(
+        question__survey_id__in=survey_ids
+    )
+
+    if interviewer_name:
+        respondents_qs = respondents_qs.filter(
+            interviewer_name=interviewer_name
         )
+        responses_qs = responses_qs.filter(
+            respondent__interviewer_name=interviewer_name
+        )
+
+    if date_from:
+        respondents_qs = respondents_qs.filter(created_at__date__gte=date_from)
+        responses_qs = responses_qs.filter(created_at__date__gte=date_from)
+
+    if date_to:
+        respondents_qs = respondents_qs.filter(created_at__date__lte=date_to)
+        responses_qs = responses_qs.filter(created_at__date__lte=date_to)
+
+    total_surveys = surveys.count()
+    total_respondents = respondents_qs.count()
+    total_responses = responses_qs.count()
+    
+
+    # Nombre de questions par enquête, pour calculer le taux de complétion.
+    question_counts = {
+        item["survey_id"]: item["total"]
+        for item in Question.objects.filter(
+            survey_id__in=survey_ids
+        ).values("survey_id").annotate(
+            total=Count("id")
+        )
+    }
+
+    expected_answers = sum(
+        question_counts.get(respondent.survey_id, 0)
+        for respondent in respondents_qs.only("survey_id")
+    )
+
+    completion_rate = (
+        round((total_responses / expected_answers) * 100, 1)
+        if expected_answers
+        else 0
+    )
+
+    # Répartition des réponses et répondants par enquête.
+    responses_per_survey = {
+        item["question__survey_id"]: item["total"]
+        for item in responses_qs.values(
+            "question__survey_id"
+        ).annotate(
+            total=Count("id")
+        )
+    }
+
+    respondents_per_survey = {
+        item["survey_id"]: item["total"]
+        for item in respondents_qs.values(
+            "survey_id"
+        ).annotate(
+            total=Count("id")
+        )
+    }
+
+    surveys_data = []
+
+    for survey in surveys.order_by("-updated_at"):
+        response_count = responses_per_survey.get(survey.id, 0)
+        respondent_count = respondents_per_survey.get(survey.id, 0)
+        question_count = question_counts.get(survey.id, 0)
+
+        expected_for_survey = respondent_count * question_count
+
+        survey_completion = (
+            round((response_count / expected_for_survey) * 100, 1)
+            if expected_for_survey
+            else 0
+        )
+
+        surveys_data.append({
+            "id": survey.id,
+            "title": survey.title,
+            "description": survey.description or "",
+            "responses": response_count,
+            "respondents": respondent_count,
+            "questions": question_count,
+            "completion_rate": survey_completion,
+            "created_at": timezone.localtime(
+                survey.created_at
+            ).strftime("%d/%m/%Y"),
+            "updated_at": timezone.localtime(
+                survey.updated_at
+            ).strftime("%d/%m/%Y %H:%M"),
+        })
+
+    top_surveys = sorted(
+        surveys_data,
+        key=lambda survey: survey["responses"],
+        reverse=True,
+    )[:10]
+
+    active_surveys = sum(
+        1 for survey in surveys_data if survey["respondents"] > 0
+    )
+
+    # Répartition par enquêteur.
+    interviewer_stats = []
+
+    interviewer_data = respondents_qs.values(
+        "interviewer_name"
+    ).annotate(
+        respondents=Count("id")
+    ).order_by("-respondents")
+
+    for item in interviewer_data:
+        interviewer_stats.append({
+            "name": item["interviewer_name"] or "Non renseigné",
+            "respondents": item["respondents"],
+        })
+
+    # Activité sur les 30 derniers jours.
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+
+    activity_data = respondents_qs.filter(
+        created_at__gte=thirty_days_ago
+    ).extra(
+        {"day": "DATE(created_at)"}
+    ).values(
+        "day"
+    ).annotate(
+        respondents=Count("id")
+    ).order_by("day")
+
+    daily_activity = []
+
+    for item in activity_data:
+        day = item["day"]
+
+        daily_activity.append({
+            "date": str(day),
+            "respondents": item["respondents"],
+        })
+
+    surveys_without_responses = [
+        {
+            "id": survey["id"],
+            "title": survey["title"],
+        }
+        for survey in surveys_data
+        if survey["respondents"] == 0
+    ][:5]
 
     return Response(
         {
+            # Compatibilité avec ton dashboard actuel
             "total_surveys": total_surveys,
             "total_responses": total_responses,
-            "top_surveys": top,
+            "top_surveys": top_surveys,
+            "available_surveys": available_surveys,
+            "available_interviewers": available_interviewers,
+
+            # Nouveaux indicateurs
+            "total_respondents": total_respondents,
+            "active_surveys": active_surveys,
+            "completion_rate": completion_rate,
+            "interviewer_stats": interviewer_stats,
+            "daily_activity": daily_activity,
+            "surveys_without_responses": surveys_without_responses,
         },
         status=status.HTTP_200_OK,
     )

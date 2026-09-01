@@ -120,3 +120,30 @@ class Response(models.Model):
 
     def __str__(self):
         return f"Réponse à {self.question.text}"
+
+class SurveyAIAnalysis(models.Model):
+    survey = models.ForeignKey(
+        Survey,
+        related_name="ai_analyses",
+        on_delete=models.CASCADE,
+    )
+
+    owner = models.ForeignKey(
+        User,
+        related_name="survey_ai_analyses",
+        on_delete=models.CASCADE,
+    )
+
+    summary = models.JSONField(default=dict)
+    analysis = models.JSONField(default=dict)
+
+    credits_used = models.PositiveIntegerField(default=0)
+    tokens = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Analyse IA — {self.survey.title} — {self.created_at:%d/%m/%Y %H:%M}"

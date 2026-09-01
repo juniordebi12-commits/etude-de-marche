@@ -1,119 +1,134 @@
-// src/pages/Features.jsx
 import React from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../api/useAuth";
 
-function FeatureCard({ label, title, children, to }) {
+const features = [
+  {
+    label: "Création",
+    icon: "✦",
+    title: "Questionnaires personnalisés",
+    description:
+      "Créez vos enquêtes avec questions libres, choix uniques, choix multiples et réponses numériques.",
+    to: "/editor",
+    linkLabel: "Créer une enquête",
+  },
+  {
+    label: "Modèles",
+    icon: "▣",
+    title: "Modèles prêts à adapter",
+    description:
+      "Démarrez rapidement avec des modèles de satisfaction, feedback client et études de marché.",
+    to: "/templates",
+    linkLabel: "Voir les modèles",
+  },
+  {
+    label: "Collecte",
+    icon: "◉",
+    title: "Collecte centralisée",
+    description:
+      "Partagez votre enquête et centralisez les réponses collectées depuis téléphone ou ordinateur.",
+    to: "/surveys",
+    linkLabel: "Gérer mes enquêtes",
+  },
+  {
+    label: "Analyse",
+    icon: "↗",
+    title: "Dashboard, analyses et exports",
+    description:
+      "Suivez les indicateurs, consultez les graphiques et exportez les données ou analyses en Excel et PDF.",
+    to: "/dashboard",
+    linkLabel: "Ouvrir le dashboard",
+  },
+  {
+  label: "Intelligence artificielle",
+  icon: "✦",
+  title: "Analyse assistée par IA",
+  description:
+    "Sélectionnez une enquête et obtenez une synthèse claire de vos résultats, des constats et des recommandations utiles.",
+  to: "/features/analysis",
+  linkLabel: "Analyser une enquête",
+},
+];
+
+function FeatureCard({ feature }) {
   return (
-    <div className="bg-white/90 backdrop-blur-sm p-5 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
-      <div>
-        {label && (
-          <div className="text-[11px] uppercase tracking-wide text-[var(--brand,#4f46e5)] mb-1">
-            {label}
-          </div>
-        )}
-        <h3 className="font-semibold mb-2 text-slate-900 text-sm md:text-base">
-          {title}
-        </h3>
-        <p className="text-xs md:text-sm text-slate-600 leading-relaxed">
-          {children}
-        </p>
+    <article className="group flex min-h-64 flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg">
+      <div className="flex items-start justify-between gap-4">
+        <span className="rounded-xl bg-blue-50 px-3 py-2 text-lg font-bold text-blue-600">
+          {feature.icon}
+        </span>
+
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          {feature.label}
+        </span>
       </div>
 
-      {to && (
-        <div className="mt-4">
-          <Link
-            to={to}
-            className="inline-flex items-center text-[11px] md:text-xs font-medium text-[var(--brand,#4f46e5)] hover:text-indigo-700"
-          >
-            Découvrir cette fonctionnalité
-            <span className="ml-1">↗</span>
-          </Link>
-        </div>
-      )}
-    </div>
+      <h3 className="mt-6 text-lg font-bold text-slate-900">
+        {feature.title}
+      </h3>
+
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        {feature.description}
+      </p>
+
+      <Link
+        to={feature.to}
+        className="mt-auto pt-6 text-sm font-semibold text-blue-600 transition group-hover:translate-x-1"
+      >
+        {feature.linkLabel} →
+      </Link>
+    </article>
   );
 }
 
 export default function Features() {
+  const { isAuthenticated, access } = useAuth();
+  const loggedIn = isAuthenticated || Boolean(access);
+
+  const ctaTo = loggedIn ? "/editor" : "/register";
+  const ctaLabel = loggedIn ? "Créer une enquête" : "Commencer gratuitement";
+
   return (
-    <section className="bg-slate-50 border-t border-slate-100">
-      <div className="container py-12 md:py-16" id="features">
-        <div className="max-w-2xl">
-          <p className="text-xs font-medium tracking-wide text-[var(--brand,#4f46e5)] uppercase mb-2">
-            Pensé pour les équipes exigeantes
+    <section className="min-h-screen border-y border-slate-200 bg-[#f8fafc]">
+      <div className="container py-14 md:py-20" id="features">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-sm font-bold uppercase tracking-wider text-blue-600">
+            L’essentiel pour vos enquêtes
           </p>
-          <h2 className="text-2xl md:text-3xl font-bold mb-3 text-slate-900">
-            De l’idée au rapport, dans le même outil
-          </h2>
-          <p className="text-sm md:text-base text-slate-600">
-            Sana couvre tout le cycle de vos enquêtes : création, collecte sur
-            le terrain, analyse avancée, rapports automatiques et travail en
-            équipe.
+
+          <h1 className="mt-3 text-3xl font-extrabold text-slate-950 md:text-4xl">
+            Créez, collectez et décidez avec vos données.
+          </h1>
+
+          <p className="mt-5 text-sm leading-7 text-slate-600 md:text-base">
+            SanaMetrics réunit les outils nécessaires pour préparer une
+            enquête, recueillir les réponses et comprendre clairement vos
+            résultats.
           </p>
         </div>
 
-        <div className="mt-8 grid gap-6 md:grid-cols-3">
-          {/* Création / Modèles */}
-          <FeatureCard
-            label="Création"
-            title="Éditeur moderne & modèles prêts"
-            to="/templates"   // ➜ Produits → Modèles prêts
-          >
-            Concevez vos questionnaires en quelques minutes ou partez de
-            modèles prêts (Satisfaction client, NPS, Feedback service) que vous
-            adaptez à votre contexte.
-          </FeatureCard>
+        <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {features.map((feature) => (
+            <FeatureCard key={feature.title} feature={feature} />
+          ))}
+        </div>
 
-          {/* IA */}
-          <FeatureCard
-            label="Intelligence"
-            title="Génération assistée par IA"
-            to="/features/ai"   // ➜ Produits → Génération IA
-          >
-            Décrivez votre besoin, Sana propose une première version des
-            questions, les reformule et vous aide à structurer un formulaire
-            clair et complet.
-          </FeatureCard>
+        <div className="mt-12 rounded-2xl border border-blue-200 bg-blue-50 px-6 py-8 text-center">
+          <h2 className="text-xl font-bold text-slate-900">
+            Prêt à lancer votre première enquête ?
+          </h2>
 
-          {/* Offline / collecte */}
-          <FeatureCard
-            label="Terrain"
-            title="Collecte robuste, même hors-ligne"
-            to="/surveys"   // tu peux créer une vraie page /offline plus tard
-          >
-            Les réponses sont enregistrées sur l’appareil et se synchronisent
-            automatiquement dès que le réseau revient. Parfait pour les études
-            de terrain et zones à faible connexion.
-          </FeatureCard>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">
+            Créez votre questionnaire, partagez-le et retrouvez vos réponses
+            dans le dashboard.
+          </p>
 
-          {/* Analyse avancée */}
-          <FeatureCard
-            label="Analyse"
-            title="Dashboards & analyse avancée"
-            to="/features/analysis"   // ➜ Produits → Analyse avancée
+          <Link
+            to={ctaTo}
+            className="mt-5 inline-flex rounded-xl bg-blue-600 px-5 py-3 font-semibold text-on-brand transition hover:bg-blue-700"
           >
-            Visualisez instantanément le volume de réponses, les répartitions
-            par choix, les tendances et les scores critiques comme le NPS.
-          </FeatureCard>
-
-          {/* Rapports automatiques */}
-          <FeatureCard
-            label="Rapports"
-            title="Rapports automatiques & exports"
-            to="/reports"   // ➜ Produits → Rapports automatiques (page à créer si pas encore)
-          >
-            Exportez les données en CSV et générez des synthèses prêtes à être
-            partagées dans vos présentations, comptes rendus ou réunions.
-          </FeatureCard>
-
-          {/* Outils Pro – Collaboration / Intégrations */}
-          <FeatureCard
-            label="Outils Pro"
-            title="Collaboration & intégrations"
-          >
-            Travaillez à plusieurs sur les enquêtes, partagez les résultats aux
-            bonnes personnes et connectez Sana à vos outils (BI, CRM, etc.).
-          </FeatureCard>
+            {ctaLabel}
+          </Link>
         </div>
       </div>
     </section>

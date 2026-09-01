@@ -1,11 +1,26 @@
-// src/pages/SurveyThanks.jsx
-import React, { useEffect, useState, useRef } from "react";
-import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../api/useAuth";
-import { getSurvey } from "../api/useDashboard";
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import Confetti from "react-confetti";
+import { useAuth } from "../api/useAuth";
+import { getSurvey } from "../api/useDashboard";
+
+function answerLabel(answer) {
+  if (answer?.answer_text) return answer.answer_text;
+
+  if (Array.isArray(answer?.selected_choices)) {
+    return answer.selected_choices
+      .map((choice) => {
+        if (typeof choice === "string") return choice;
+        return choice?.text || choice?.label || choice?.value || "";
+      })
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  return answer?.selected_choices || "—";
+}
 
 export default function SurveyThanks() {
   const { id } = useParams();
@@ -15,253 +30,263 @@ export default function SurveyThanks() {
 
   const [surveyTitle, setSurveyTitle] = useState("");
   const [loadingTitle, setLoadingTitle] = useState(false);
-
-  // confetti toggle
   const [showConfetti, setShowConfetti] = useState(true);
 
-  // redirect timer
-  const [countdown, setCountdown] = useState(30); // seconds before redirect
-  const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(true);
-
-  // element ref à capturer pour PNG/PDF
   const receiptRef = useRef(null);
+  const receiptNumber = useRef(
+    `S-${id}-${Date.now().toString().slice(-5)}`
+  );
 
-  // answers/respondent passés via navigate state (SurveyTake envoie via nav(..., { state: { answers, respondent } }))
-  const passedAnswers = (location.state && location.state.answers) || null;
-  const passedRespondent = (location.state && location.state.respondent) || null;
+  const passedAnswers = location.state?.answers || [];
+  const passedRespondent = location.state?.respondent || null;
+
+  const isOnlineResponse =
+    !access || passedRespondent?.interviewer_name === "Réponse en ligne";
 
   useEffect(() => {
     let mounted = true;
-    if (!surveyTitle && id) {
+
+    async function loadSurveyTitle() {
+      if (!id) return;
+
       setLoadingTitle(true);
-      getSurvey(access, id)
-        .then((sv) => {
-          if (!mounted) return;
-          setSurveyTitle(sv?.title || "");
-        })
-        .catch(() => {})
-        .finally(() => mounted && setLoadingTitle(false));
-    }
-    return () => { mounted = false; };
-  }, [id, access, surveyTitle]);
 
-  // countdown effect for redirect
-  useEffect(() => {
-    if (!autoRedirectEnabled) return;
-    if (countdown <= 0) {
-      nav("/dashboard");
-      return;
-    }
-    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [countdown, autoRedirectEnabled, nav]);
+      try {
+        const survey = await getSurvey(access, id);
 
-  // small helpers
-  const downloadBlob = (filename, blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadJson = () => {
-    const payload = {
-      survey_id: id,
-      survey_title: surveyTitle || null,
-      respondent: passedRespondent || null,
-      answers: passedAnswers || [],
-      submitted_at: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    downloadBlob(`receipt_survey_${id}.json`, blob);
-  };
-
-  const handleDownloadCsv = () => {
-    if (!Array.isArray(passedAnswers) || passedAnswers.length === 0) {
-      alert("Aucune réponse disponible à exporter.");
-      return;
-    }
-    // build CSV rows
-    const keys = ["index", "question", "answer_text", "selected_choices"];
-    const rows = passedAnswers.map((a, i) => {
-      return keys.map((k) => {
-        if (k === "index") return i + 1;
-        if (k === "selected_choices") {
-          return Array.isArray(a.selected_choices) ? a.selected_choices.join("|") : (a.selected_choices || "");
+        if (mounted) {
+          setSurveyTitle(survey?.title || "");
         }
-        return a[k] ?? (k === "question" ? (a.question_text || a.question || "") : "");
-      }).map(v => `"${String(v).replace(/"/g,'""')}"`).join(",");
-    });
-    const csv = `${keys.join(",")}\n${rows.join("\n")}`;
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    downloadBlob(`receipt_survey_${id}.csv`, blob);
-  };
-
-  // capture receiptRef as PNG then convert to PDF (one page)
-  const handleDownloadPdf = async () => {
-    if (!receiptRef.current) {
-      alert("Aucune zone disponible pour la capture.");
-      return;
+      } catch {
+        if (mounted) {
+          setSurveyTitle("");
+        }
+      } finally {
+        if (mounted) {
+          setLoadingTitle(false);
+        }
+      }
     }
-    try {
-      // capture with high quality
-      const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-      const imgData = canvas.toDataURL("image/png");
 
+    loadSurveyTitle();
+
+    return () => {
+      mounted = false;
+    };
+  }, [id, access]);
+
+  async function downloadReceiptPdf() {
+    if (!receiptRef.current) return;
+
+    try {
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imageData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "pt",
-        format: "a4"
+        format: "a4",
       });
+
+      const margin = 32;
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
+      const printableWidth = pageWidth - margin * 2;
+      const printableHeight = pageHeight - margin * 2;
 
-      // scale image to fit page while keeping aspect ratio
-      const img = new Image();
-      img.src = imgData;
-      await new Promise((res) => (img.onload = res));
+      const imageHeight = (canvas.height * printableWidth) / canvas.width;
 
-      const imgW = img.width;
-      const imgH = img.height;
-      const ratio = Math.min(pageWidth / imgW, pageHeight / imgH);
-      const w = imgW * ratio;
-      const h = imgH * ratio;
-      const x = (pageWidth - w) / 2;
-      const y = 20;
+      let remainingHeight = imageHeight;
+      let imageY = margin;
 
-      pdf.addImage(imgData, "PNG", x, y, w, h);
-      pdf.save(`receipt_survey_${id}.pdf`);
-    } catch (e) {
-      console.error("PDF generation failed", e);
-      alert("Erreur génération PDF — regarde la console.");
+      pdf.addImage(
+        imageData,
+        "PNG",
+        margin,
+        imageY,
+        printableWidth,
+        imageHeight
+      );
+
+      remainingHeight -= printableHeight;
+
+      while (remainingHeight > 0) {
+        pdf.addPage();
+
+        imageY = margin - (imageHeight - remainingHeight);
+
+        pdf.addImage(
+          imageData,
+          "PNG",
+          margin,
+          imageY,
+          printableWidth,
+          imageHeight
+        );
+
+        remainingHeight -= printableHeight;
+      }
+
+      pdf.save(`confirmation_sanametrics_${id}.pdf`);
+    } catch (error) {
+      console.error("Erreur lors de la génération du PDF :", error);
+      alert("Impossible de générer le récapitulatif PDF.");
     }
-  };
+  }
 
   return (
-    <div className="container py-10">
-      {/* confetti (auto hide after a few seconds) */}
-      {showConfetti && <Confetti recycle={false} numberOfPieces={160} onConfettiComplete={() => setShowConfetti(false)} />}
+    <main className="min-h-screen bg-[#f8fafc] py-8 md:py-12">
+      {showConfetti && (
+        <Confetti
+          recycle={false}
+          numberOfPieces={130}
+          onConfettiComplete={() => setShowConfetti(false)}
+        />
+      )}
 
-      <div className="section-card" ref={receiptRef} style={{ borderTop: `4px solid var(--brand)` }}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900">
-              {passedRespondent?.interviewer_name === "Réponse en ligne" 
-                ? "Merci pour votre participation !" 
-                : "Enregistré avec succès !"}
-            </h1>
-            <p className="text-sm text-muted mt-2">
-              {loadingTitle ? "Enregistrement..." : (surveyTitle ? `Vos réponses pour : ${surveyTitle}` : `Enquête #${id}`)}
-            </p>
+      <div className="container max-w-3xl">
+        <section
+          ref={receiptRef}
+          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+        >
+          <div className="h-1.5 bg-blue-600" />
 
-            {passedRespondent && (
-              <div className="mt-3">
-                <div className="text-xs text-muted">Enquêteur</div>
-                <div className="font-medium">
-                  {passedRespondent.interviewer_name || passedRespondent.name || "—"}
+          <div className="p-5 md:p-8">
+            <div className="flex flex-col gap-5 border-b border-slate-100 pb-6 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-xl">
+                  ✓
                 </div>
-                {passedRespondent.participant_name && <div className="text-sm text-muted">Participant: {passedRespondent.participant_name}</div>}
+
+                <h1 className="text-2xl font-extrabold text-slate-950 md:text-3xl">
+                  {isOnlineResponse
+                    ? "Merci pour votre participation !"
+                    : "Réponse enregistrée avec succès !"}
+                </h1>
+
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {loadingTitle
+                    ? "Enregistrement de votre réponse…"
+                    : surveyTitle
+                      ? `Votre réponse a été ajoutée à l’enquête « ${surveyTitle} ».`
+                      : "Votre réponse a bien été enregistrée."}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 px-4 py-3 text-left sm:text-right">
+                <p className="text-xs font-medium text-slate-500">
+                  Référence
+                </p>
+                <p className="mt-1 font-mono text-sm font-semibold text-slate-800">
+                  {receiptNumber.current}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {new Date().toLocaleString("fr-FR")}
+                </p>
+              </div>
+            </div>
+
+            {passedRespondent?.participant_name && (
+              <div className="mt-5 rounded-xl bg-blue-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                  Participant
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-800">
+                  {passedRespondent.participant_name}
+                </p>
               </div>
             )}
-          </div>
 
-          <div className="text-right">
-            <div className="text-xs text-muted">Référence</div>
-            <div className="font-mono text-sm">{`S-${id}-${Date.now().toString().slice(-5)}`}</div>
-            <div className="text-xs text-muted mt-2">Soumis: {new Date().toLocaleString()}</div>
-          </div>
-        </div>
+            <div className="mt-6">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-base font-bold text-slate-900">
+                  Récapitulatif de vos réponses
+                </h2>
 
-        {/* visual separator */}
-        <div className="mt-6">
-          <div className="px-3 py-2 bg-[var(--bg-page)] rounded">
-            <div className="text-sm text-muted">Récapitulatif des réponses (extrait)</div>
-            <div className="mt-2">
-              {Array.isArray(passedAnswers) && passedAnswers.length > 0 ? (
-                <div className="text-xs">
-                  {passedAnswers.slice(0, 20).map((a, i) => (
-                    <div key={i} className="mb-2">
-                      <div className="font-medium">{a.question_text || a.question || `Question ${i+1}`}</div>
-                      <div className="text-sm text-muted">{a.answer_text || (Array.isArray(a.selected_choices) ? a.selected_choices.join(", ") : a.selected_choices) || "—"}</div>
+                {passedAnswers.length > 0 && (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                    {passedAnswers.length} réponse
+                    {passedAnswers.length > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+
+              {passedAnswers.length > 0 ? (
+                <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-100">
+                  {passedAnswers.map((answer, index) => (
+                    <div key={index} className="px-4 py-4">
+                      <p className="text-sm font-semibold text-slate-800">
+                        {answer.question_text ||
+                          answer.question ||
+                          `Question ${index + 1}`}
+                      </p>
+
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        {answerLabel(answer)}
+                      </p>
                     </div>
                   ))}
-                  {passedAnswers.length > 20 && <div className="text-xs text-muted">+ {passedAnswers.length - 20} autres réponses…</div>}
                 </div>
               ) : (
-                <div className="text-sm text-muted">Aucune réponse passée à la page de remerciement.</div>
+                <p className="mt-3 text-sm text-slate-500">
+                  Le récapitulatif détaillé n’est plus disponible après
+                  actualisation de cette page.
+                </p>
               )}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* footer actions inside the same card (will be included in PDF capture) */}
-        <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={handleDownloadJson} className="px-3 py-2 border rounded btn-outline">Télécharger JSON</button>
-            <button onClick={handleDownloadCsv} className="px-3 py-2 border rounded btn-outline">Télécharger CSV</button>
-            <button onClick={handleDownloadPdf} className="px-3 py-2 border rounded btn-outline">Télécharger PDF (capture)</button>
-          </div>
+        <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            onClick={downloadReceiptPdf}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Télécharger mon récapitulatif PDF
+          </button>
 
-          <div className="flex items-center gap-3">
-            {autoRedirectEnabled && (
-              <div className="flex items-center gap-2 mr-2">
-                <div className="text-xs text-muted hidden sm:block italic">Redirection dans :</div>
-                <div className="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full font-bold text-sm">
-                  {countdown}
-                </div>
-                <button
-                  onClick={() => setAutoRedirectEnabled(false)}
-                  className="text-[10px] uppercase tracking-wider font-bold text-red-500 hover:text-red-700 underline"
-                >
-                  Arrêter
-                </button>
-              </div>
-            )}
+          {access ? (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Link
+                to={`/surveys/${id}/take`}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-700 no-underline transition hover:bg-slate-50"
+              >
+                Nouvelle saisie
+              </Link>
 
-            {/* Actions selon le profil (Public vs Connecté) */}
-            {access ? (
-              <div className="flex gap-2">
-                <Link to={`/surveys/${id}/take`} className="px-4 py-2 border rounded hover:bg-slate-50 text-sm font-medium">
-                  Nouvelle saisie
-                </Link>
-                <button 
-                  onClick={() => nav(`/dashboard/survey/${id}`)} 
-                  className="px-4 py-2 bg-slate-900 text-white rounded hover:bg-slate-800 text-sm font-medium"
-                >
-                  Voir les résultats
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                {/* Bouton Quitter : Ferme l'onglet ou redirige vers Google si on ne peut pas fermer */}
-                <button 
-                  onClick={() => {
-                    if (window.history.length <= 1) {
-                      window.close();
-                    } else {
-                      window.location.href = "https://www.google.com";
-                    }
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg transition-colors"
-                >
-                  Quitter
-                </button>
+              <button
+                type="button"
+                onClick={() => nav(`/dashboard/survey/${id}`)}
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Voir les résultats
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => nav("/")}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Terminer
+              </button>
 
-                <Link 
-                  to={`/surveys/${id}/take`} 
-                  className="px-6 py-2 bg-[var(--brand)] text-white rounded-lg font-bold shadow-lg hover:opacity-90 transition-all"
-                >
-                  Refaire l'enquête
-                </Link>
-              </div>
-            )}
-          </div>
+              <Link
+                to={`/surveys/${id}/take`}
+                className="text-on-brand rounded-xl bg-blue-600 px-4 py-2.5 text-center text-sm font-semibold no-underline transition hover:bg-blue-700"
+              >
+                Répondre à nouveau
+              </Link>
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

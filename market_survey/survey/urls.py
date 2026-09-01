@@ -4,8 +4,8 @@ from rest_framework import routers
 
 from . import views
 from .api_views import SurveyViewSet, ResponseViewSet, RespondentViewSet
-from .api_views import mobile_sync_respondent
-from .openai_views import chat_proxy
+from .api_views import mobile_sync_respondent, dashboard_summary
+from .openai_views import chat_proxy, analyze_survey, analysis_history
 
 # ---------- ROUTER API ----------
 router = routers.DefaultRouter()
@@ -32,8 +32,22 @@ urlpatterns = [
 
     # ------- API custom endpoints -------
     path("api/openai/chat/", chat_proxy, name="api_openai_chat"),
+    path(
+    "api/openai/analyze/<int:survey_id>/",
+    analyze_survey,
+    name="api_openai_analyze_survey",
+),
+path(
+    "api/openai/analyses/",
+    analysis_history,
+    name="api_openai_analysis_history",
+),
     path("api/mobile/sync/", mobile_sync_respondent, name="mobile_sync_respondent"),
-
+    path(
+    "api/dashboard-summary/",
+    dashboard_summary,
+    name="dashboard_summary",
+),
     # ------- API REST router (/api/...) -------
     path("api/", include(router.urls)),
 ]

@@ -200,11 +200,38 @@ LOGOUT_REDIRECT_URL = "/login/"
 
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
-BILLING_DEFAULT_CREDITS = {"free": 0, "pro": 25000, "team": 200000}
+# Les crédits sont réservés aux fonctions d'intelligence artificielle.
+# Les utilisateurs ne reçoivent pas de crédits automatiques à l'inscription.
+BILLING_DEFAULT_CREDITS = {
+    "free": 0,
+}
+
 BILLING_PACKS = [
-    {"id": "c1", "name": "Pack Découverte", "credits": 5000, "price": "4 900 FCFA"},
-    {"id": "c2", "name": "Pack Pro", "credits": 25000, "price": "19 900 FCFA"},
-    {"id": "c3", "name": "Pack Volume", "credits": 120000, "price": "79 900 FCFA"},
+    {
+        "id": "c1",
+        "name": "Pack Découverte",
+        "credits": 10,
+        "price_fcfa": 1000,
+    },
+    {
+        "id": "c2",
+        "name": "Pack Terrain",
+        "credits": 40,
+        "price_fcfa": 3000,
+    },
+    {
+        "id": "c3",
+        "name": "Pack Croissance",
+        "credits": 100,
+        "price_fcfa": 6000,
+        "recommended": True,
+    },
+    {
+        "id": "c4",
+        "name": "Pack Organisation",
+        "credits": 250,
+        "price_fcfa": 12000,
+    },
 ]
 
 CLOUDINARY_STORAGE = {
@@ -213,4 +240,4 @@ CLOUDINARY_STORAGE = {
     "API_SECRET": os.getenv("CLOUDINARY_API_SECRET"),
 }
 
-MOCK_OPENAI = True
+MOCK_OPENAI = False
